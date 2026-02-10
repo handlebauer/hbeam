@@ -1,0 +1,41 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": null,
+	"categories": {
+		"nursery": "error",
+		"correctness": "error",
+		"style": "error"
+	},
+	"rules": {
+		"no-console": "off",
+		"id-length": "off",
+		"func-style": ["error", "declaration"],
+		"max-statements": ["error", 25],
+		"prefer-destructuring": "off",
+		"no-ternary": "off",
+		"sort-imports": "off"
+	},
+	"settings": {
+		"jsdoc": {
+			"ignorePrivate": false,
+			"ignoreInternal": false,
+			"ignoreReplacesDocs": true,
+			"overrideReplacesDocs": true,
+			"augmentsExtendsReplacesDocs": false,
+			"implementsReplacesDocs": false,
+			"exemptDestructuredRootsFromChecks": false,
+			"tagNamePreference": {}
+		}
+	},
+	"env": {
+		"builtin": true
+	},
+	"globals": {
+		"Bun": "readonly",
+		"console": "readonly",
+		"process": "readonly",
+		"setTimeout": "readonly",
+		"clearTimeout": "readonly"
+	},
+	"ignorePatterns": []
+}
