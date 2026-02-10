@@ -2,10 +2,7 @@ import { blank, clearLine, dim, log } from './log.ts'
 
 import type { Beam } from '../beam.ts'
 
-/** Exit code indicating failure. */
 const EXIT_FAILURE = 1
-
-/** Grace period (ms) before force-killing on shutdown. */
 const SHUTDOWN_TIMEOUT_MS = 2000
 
 /** Controller for graceful shutdown of a beam session. */

@@ -30,6 +30,8 @@ const ARGV_OFFSET = 2
 const EXIT_SUCCESS = 0
 const EXIT_FAILURE = 1
 
+const NO_INDENT = ''
+
 const argv = mri(process.argv.slice(ARGV_OFFSET), {
 	alias: { h: 'help', l: 'listen', v: 'version' },
 	boolean: ['help', 'listen', 'version'],
@@ -62,7 +64,7 @@ if (argv.help) {
 
 if (argv.version) {
 	const pkg = (await import('../package.json')) as { version?: string }
-	write(pkg.version ?? '0.0.0')
+	write(pkg.version ?? '0.0.0', NO_INDENT)
 	process.exit(EXIT_SUCCESS)
 }
 

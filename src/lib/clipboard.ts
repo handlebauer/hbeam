@@ -9,7 +9,6 @@ const EXIT_SUCCESS = 0
 const EMPTY_ARGS: readonly string[] = []
 
 const DARWIN_COMMANDS: readonly ClipboardCommand[] = [{ args: EMPTY_ARGS, command: 'pbcopy' }]
-
 const WINDOWS_COMMANDS: readonly ClipboardCommand[] = [{ args: EMPTY_ARGS, command: 'clip' }]
 
 const LINUX_COMMANDS: readonly ClipboardCommand[] = [

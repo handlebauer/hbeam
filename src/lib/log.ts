@@ -2,23 +2,16 @@ import { dim, red, yellow } from 'colorette'
 
 export { bold, cyan, dim, gray, green, italic, red, yellow } from 'colorette'
 
-export const INDENT = '  '
-
-/** Width of the visual separator line. */
 const SEPARATOR_WIDTH = 36
-
-/** A dim dashed line used to bracket piped content. */
-export const SEPARATOR = dim('╌'.repeat(SEPARATOR_WIDTH))
-
-/** ANSI escape: clear the entire current line and reset cursor to column 0. */
 const CLEAR_LINE = '\r\u001B[2K'
-
-/** Zero offset — cursor is on the spinner line itself. */
 const NO_OFFSET = 0
 
+export const INDENT = '  '
+export const SEPARATOR = dim('╌'.repeat(SEPARATOR_WIDTH))
+
 /** Write a line to stderr at the standard indent level. */
-export function write(message: string): void {
-	process.stderr.write(`${INDENT}${message}\n`)
+export function write(message: string, indent: string = INDENT): void {
+	process.stderr.write(`${indent}${message}\n`)
 }
 
 /** Write a blank line to stderr. */

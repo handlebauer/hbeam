@@ -13,7 +13,8 @@
 		"max-statements": ["error", 25],
 		"prefer-destructuring": "off",
 		"no-ternary": "off",
-		"sort-imports": "off"
+		"sort-imports": "off",
+		"capitalized-comments": "off"
 	},
 	"settings": {
 		"jsdoc": {
@@ -32,6 +33,7 @@
 	},
 	"globals": {
 		"Bun": "readonly",
+		"Buffer": "readonly",
 		"console": "readonly",
 		"process": "readonly",
 		"setTimeout": "readonly",
