@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { Transform } from 'node:stream'
+
 import mri from 'mri'
 
 import { Beam } from './beam.ts'
@@ -10,11 +12,13 @@ import {
 	bold,
 	createSpinner,
 	cyan,
-	red,
 	dim,
 	gray,
+	INDENT,
 	log,
 	logError,
+	red,
+	SEPARATOR,
 	write,
 	writeBlock,
 } from './lib/log.ts'
@@ -128,7 +132,28 @@ beam.on('error', (error: Error) => {
 
 beam.on('end', () => beam.end())
 
-process.stdin.pipe(beam).pipe(process.stdout)
+let receivedData = false
+
+const indent = new Transform({
+	flush(cb) {
+		if (receivedData) {
+			blank()
+			write(SEPARATOR)
+		}
+		cb(undefined, '\n')
+	},
+	transform(chunk: Buffer, _encoding, cb) {
+		if (!receivedData) {
+			receivedData = true
+			write(SEPARATOR)
+			blank()
+		}
+		const lines = chunk.toString().replace(/^(?!$)/gm, INDENT)
+		cb(undefined, lines)
+	},
+})
+
+process.stdin.pipe(beam).pipe(indent).pipe(process.stdout)
 
 if (typeof process.stdin.unref === 'function') {
 	process.stdin.unref()

@@ -1,8 +1,14 @@
-import { red, yellow } from 'colorette'
+import { dim, red, yellow } from 'colorette'
 
 export { bold, cyan, dim, gray, green, italic, red, yellow } from 'colorette'
 
-const INDENT = '  '
+export const INDENT = '  '
+
+/** Width of the visual separator line. */
+const SEPARATOR_WIDTH = 36
+
+/** A dim dashed line used to bracket piped content. */
+export const SEPARATOR = dim('╌'.repeat(SEPARATOR_WIDTH))
 
 /** ANSI escape: clear the entire current line and reset cursor to column 0. */
 const CLEAR_LINE = '\r\u001B[2K'
