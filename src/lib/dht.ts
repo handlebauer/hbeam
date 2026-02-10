@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import * as b4a from 'b4a'
 import DHT from 'hyperdht'
 
@@ -5,9 +7,27 @@ import { fromBase32 } from './encoding.ts'
 
 import type { EncryptedSocket, HyperDHTNode, KeyPair } from '../types.ts'
 
+const KEY_SEED_BYTES = 32
+
+/**
+ * Normalize an arbitrary decoded seed into exactly 32 bytes.
+ *
+ * HyperDHT's `keyPair()` behavior for non-32-byte seeds can differ across JS
+ * runtimes (e.g. Node vs Bun). By hashing to 32 bytes we ensure both sides
+ * derive the same keypair for a given passphrase.
+ */
+function normalizeSeed(seed: Buffer): Buffer {
+	if (seed.length === KEY_SEED_BYTES) {
+		return seed
+	}
+	const digest = createHash('sha256').update(seed).digest()
+	return b4a.from(digest)
+}
+
 /** Derive a Noise keypair from a base32-encoded passphrase. */
 export function deriveKeyPair(passphrase: string): KeyPair {
-	return DHT.keyPair(fromBase32(passphrase))
+	const seed = fromBase32(passphrase)
+	return DHT.keyPair(normalizeSeed(seed))
 }
 
 /** Create an ephemeral HyperDHT node that is destroyed with the beam. */
