@@ -1,6 +1,6 @@
 {
 	"name": "hbeam",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "A 1-to-1 end-to-end encrypted pipe over HyperDHT.",
 	"keywords": [
 		"cli",
@@ -25,8 +25,8 @@
 		"lint": "oxlint",
 		"prepack": "bun run build",
 		"prepare": "test -w .git/config && husky || true",
-		"pub": "bun run scripts/repo/publish",
 		"prepublishOnly": "bun run check && bun run build",
+		"pub": "bun run scripts/repo/publish",
 		"test": "bun test"
 	},
 	"dependencies": {
