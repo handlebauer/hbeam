@@ -5,19 +5,18 @@ import { runBeamSession } from '@/lib/session.ts'
 
 import { Beam } from '../beam.ts'
 
-const EXIT_SUCCESS = 0
 const EXIT_FAILURE = 1
 const PUBLIC_KEY_BYTES = 32
 
-/** Execute `hbeam connect <name>`. */
-export async function runConnectCommand(argv: string[]): Promise<number> {
+/** Execute `hbeam connect <name>`. Exits on error; stays alive for the session. */
+export async function runConnectCommand(argv: string[]): Promise<void> {
 	const [name] = argv
 	if (!name) {
 		blank()
 		logError('Missing peer name.')
 		write(dim('Usage: hbeam connect <name>'))
 		blank()
-		return EXIT_FAILURE
+		process.exit(EXIT_FAILURE)
 	}
 
 	const peer = await getPeer(name).catch(() => undefined)
@@ -25,7 +24,7 @@ export async function runConnectCommand(argv: string[]): Promise<number> {
 		blank()
 		logError(`Unknown peer: ${name}`)
 		blank()
-		return EXIT_FAILURE
+		process.exit(EXIT_FAILURE)
 	}
 
 	const remotePublicKey = Buffer.from(peer.publicKey, 'hex')
@@ -33,7 +32,7 @@ export async function runConnectCommand(argv: string[]): Promise<number> {
 		blank()
 		logError(`Invalid public key for peer: ${name}`)
 		blank()
-		return EXIT_FAILURE
+		process.exit(EXIT_FAILURE)
 	}
 
 	const identity = await loadOrCreateIdentityWithMeta()
@@ -52,6 +51,4 @@ export async function runConnectCommand(argv: string[]): Promise<number> {
 		mode: 'connect',
 		value: name,
 	})
-
-	return EXIT_SUCCESS
 }

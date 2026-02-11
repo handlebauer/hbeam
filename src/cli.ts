@@ -66,43 +66,47 @@ if (argv.version) {
 }
 
 const [firstArg, ...restArgs] = argv._ as string[]
+let ranSubcommand = false
 
 if (firstArg === 'peers') {
 	process.exit(await runPeersCommand(restArgs))
 }
 if (firstArg === 'connect') {
-	process.exit(await runConnectCommand(restArgs))
+	await runConnectCommand(restArgs)
+	ranSubcommand = true
 }
 if (firstArg === 'whoami') {
 	process.exit(await runWhoamiCommand())
 }
 
-const passphrase = firstArg
+if (!ranSubcommand) {
+	const passphrase = firstArg
 
-if (argv.listen && !passphrase) {
-	const identity = await loadOrCreateIdentityWithMeta()
-	if (identity.created) {
-		log(dim('IDENTITY CREATED'))
-		write(cyan(identity.keyPair.publicKey.toString('hex')))
+	if (argv.listen && !passphrase) {
+		const identity = await loadOrCreateIdentityWithMeta()
+		if (identity.created) {
+			log(dim('IDENTITY CREATED'))
+			write(cyan(identity.keyPair.publicKey.toString('hex')))
+		}
+
+		const beam = new Beam({
+			announce: true,
+			keyPair: identity.keyPair,
+		})
+		runBeamSession(beam, {
+			announceLabel: 'PUBLIC KEY',
+			copyValue: copyToClipboard,
+			mode: 'announce',
+			value: beam.key,
+		})
+	} else {
+		const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
+		const beam = new Beam(passphrase, beamOptions)
+		runBeamSession(beam, {
+			announceLabel: 'PASSPHRASE',
+			copyValue: copyToClipboard,
+			mode: beam.announce ? 'announce' : 'connect',
+			value: beam.announce ? beam.key : (passphrase ?? 'unknown'),
+		})
 	}
-
-	const beam = new Beam({
-		announce: true,
-		keyPair: identity.keyPair,
-	})
-	runBeamSession(beam, {
-		announceLabel: 'PUBLIC KEY',
-		copyValue: copyToClipboard,
-		mode: 'announce',
-		value: beam.key,
-	})
-} else {
-	const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
-	const beam = new Beam(passphrase, beamOptions)
-	runBeamSession(beam, {
-		announceLabel: 'PASSPHRASE',
-		copyValue: copyToClipboard,
-		mode: beam.announce ? 'announce' : 'connect',
-		value: beam.announce ? beam.key : (passphrase ?? 'unknown'),
-	})
 }
