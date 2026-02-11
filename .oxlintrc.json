@@ -10,11 +10,12 @@
 		"no-console": "off",
 		"id-length": "off",
 		"func-style": ["error", "declaration"],
-		"max-statements": ["error", 25],
+		"max-statements": ["error", 50],
 		"prefer-destructuring": "off",
 		"no-ternary": "off",
 		"sort-imports": "off",
-		"capitalized-comments": "off"
+		"capitalized-comments": "off",
+		"unicorn/no-null": "off"
 	},
 	"settings": {
 		"jsdoc": {

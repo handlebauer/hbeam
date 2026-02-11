@@ -2,7 +2,7 @@
 
 A 1-to-1 end-to-end encrypted pipe over [HyperDHT](https://github.com/holepunchto/hyperdht).
 
-Pipe data between two machines through a peer-to-peer encrypted tunnel. No server, no accounts — just a shared passphrase.
+Pipe data between two machines through a peer-to-peer encrypted tunnel. No server, no accounts. Just a shared passphrase or a persistent identity.
 
 ## Install
 
@@ -42,10 +42,67 @@ Re-use a specific passphrase with `--listen`:
 echo 'hello again' | hbeam <passphrase> --listen
 ```
 
+### Listen with a persistent identity
+
+Listen on a stable public key instead of a one-off passphrase. Your identity is created automatically on first use and stored at `~/.config/hbeam/identity.json`:
+
+```bash
+hbeam --listen
+```
+
+```
+  HBEAM ·····
+  PUBLIC KEY
+  a1b2c3d4e5f6...
+```
+
+Share your public key once — peers can reconnect any time without a new passphrase.
+
+### Address book
+
+Save peers by name so you don't have to remember public keys:
+
+```bash
+# Add a peer
+hbeam peers add workserver a1b2c3d4e5f6...
+
+# List saved peers
+hbeam peers ls
+```
+
+```
+  PEERS
+
+  workserver  a1b2c3d4...  2d ago
+```
+
+```bash
+# Connect by name
+hbeam connect workserver
+
+# Remove a peer
+hbeam peers rm workserver
+```
+
+Peers are stored locally at `~/.config/hbeam/peers.json`.
+
+### Show your identity
+
+Print your public key (and copy it to the clipboard):
+
+```bash
+hbeam whoami
+```
+
+```
+  IDENTITY
+  a1b2c3d4e5f6...
+```
+
 ### Options
 
 ```
--l, --listen   Listen (announce) using the provided passphrase
+-l, --listen   Listen using passphrase or identity
 -h, --help     Show help
 -v, --version  Show version
 ```
@@ -57,6 +114,8 @@ echo 'hello again' | hbeam <passphrase> --listen
 3. An ephemeral HyperDHT node announces (server) or connects (client) using that keypair.
 4. The Noise protocol negotiates an encrypted session between the two peers.
 5. Data flows through a `streamx` duplex stream — stdin/stdout on the CLI, or any readable/writable in code.
+
+When using identity mode (`--listen` without a passphrase, or `connect`), a persistent keypair is loaded from `~/.config/hbeam/identity.json` instead of deriving one from a passphrase. The connection is still end-to-end encrypted via Noise.
 
 All traffic is end-to-end encrypted. The DHT is only used for peer discovery; it never sees the plaintext.
 

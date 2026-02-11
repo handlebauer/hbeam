@@ -1,34 +1,21 @@
 #!/usr/bin/env node
 
-import { Transform } from 'node:stream'
-
 import mri from 'mri'
 
-import { Beam } from './beam.ts'
-import { copyToClipboard } from './lib/clipboard.ts'
-import { createLifecycle } from './lib/lifecycle.ts'
-import {
-	blank,
-	bold,
-	createSpinner,
-	cyan,
-	dim,
-	gray,
-	INDENT,
-	log,
-	logError,
-	red,
-	SEPARATOR,
-	write,
-	writeBlock,
-} from './lib/log.ts'
-import { createPulseFrames } from './lib/pulse.ts'
+import { copyToClipboard } from '@/lib/clipboard.ts'
+import { loadOrCreateIdentityWithMeta } from '@/lib/identity.ts'
+import { bold, cyan, dim, log, write, writeBlock } from '@/lib/log.ts'
+import { runBeamSession } from '@/lib/session.ts'
 
-import type { BeamOptions, ConnectionInfo } from './types.ts'
+import { Beam } from './beam.ts'
+import { runConnectCommand } from './commands/connect.ts'
+import { runPeersCommand } from './commands/peers.ts'
+import { runWhoamiCommand } from './commands/whoami.ts'
+
+import type { BeamOptions } from './types.ts'
 
 const ARGV_OFFSET = 2
 const EXIT_SUCCESS = 0
-const EXIT_FAILURE = 1
 
 const NO_INDENT = ''
 
@@ -43,9 +30,12 @@ if (argv.help) {
 		'',
 		`${bold('Usage:')}`,
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
+		`  hbeam connect ${dim('<name>')}`,
+		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
+		`  hbeam whoami`,
 		'',
 		`${bold('Options:')}`,
-		`  ${dim('-l, --listen')}   Listen using the provided passphrase`,
+		`  ${dim('-l, --listen')}   Listen using passphrase or identity`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
 		'',
@@ -58,6 +48,13 @@ if (argv.help) {
 		'',
 		`  ${dim('# Listen with a specific passphrase')}`,
 		"  echo 'hello again' | hbeam <passphrase> --listen",
+		'',
+		`  ${dim('# Listen on your persistent identity')}`,
+		'  hbeam --listen',
+		'',
+		`  ${dim('# Save and connect to peers by name')}`,
+		'  hbeam peers add workserver <public-key>',
+		'  hbeam connect workserver',
 	])
 	process.exit(EXIT_SUCCESS)
 }
@@ -68,95 +65,44 @@ if (argv.version) {
 	process.exit(EXIT_SUCCESS)
 }
 
-const [passphrase] = argv._ as string[]
+const [firstArg, ...restArgs] = argv._ as string[]
+
+if (firstArg === 'peers') {
+	process.exit(await runPeersCommand(restArgs))
+}
+if (firstArg === 'connect') {
+	process.exit(await runConnectCommand(restArgs))
+}
+if (firstArg === 'whoami') {
+	process.exit(await runWhoamiCommand())
+}
+
+const passphrase = firstArg
 
 if (argv.listen && !passphrase) {
-	logError('The --listen flag requires an existing passphrase.')
-	write(dim('Usage: hbeam <passphrase> --listen'))
-	process.exit(EXIT_FAILURE)
-}
+	const identity = await loadOrCreateIdentityWithMeta()
+	if (identity.created) {
+		log(dim('IDENTITY CREATED'))
+		write(cyan(identity.keyPair.publicKey.toString('hex')))
+	}
 
-const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
-const beam = new Beam(passphrase, beamOptions)
-
-const { frames, intervalMs } = createPulseFrames('HBEAM')
-const spinner = createSpinner(frames, intervalMs)
-const lifecycle = createLifecycle(beam, spinner)
-
-blank()
-spinner.start()
-spinner.blank()
-
-if (beam.announce) {
-	spinner.write(dim('PASSPHRASE'))
-	spinner.write(cyan(beam.key))
-	copyToClipboard(beam.key)
+	const beam = new Beam({
+		announce: true,
+		keyPair: identity.keyPair,
+	})
+	runBeamSession(beam, {
+		announceLabel: 'PUBLIC KEY',
+		copyValue: copyToClipboard,
+		mode: 'announce',
+		value: beam.key,
+	})
 } else {
-	spinner.write(dim('CONNECTING'))
-	spinner.write(cyan(passphrase ?? 'unknown'))
-}
-
-beam.on('remote-address', ({ host, port }: ConnectionInfo) => {
-	if (lifecycle.done()) {
-		return
-	}
-	if (host) {
-		spinner.write(dim(`ONLINE ${gray(`[${host}:${port}]`)}`))
-		spinner.blank()
-	}
-})
-
-beam.on('connected', () => {
-	if (lifecycle.done()) {
-		return
-	}
-	spinner.stop()
-	log(bold('PIPE ACTIVE'))
-	write(gray('CTRL+C TO TERMINATE'))
-	blank()
-})
-
-beam.on('error', (error: Error) => {
-	spinner.stop()
-	const isPeerNotFound = error.message.includes('PEER_NOT_FOUND')
-	if (isPeerNotFound) {
-		log(red(dim('PEER NOT FOUND')))
-	} else if (error.message.includes('connection reset by peer')) {
-		log(dim('PEER DISCONNECTED'))
-	} else {
-		logError(error.message)
-	}
-	blank()
-	if (!isPeerNotFound) {
-		lifecycle.shutdown()
-	}
-})
-
-beam.on('end', () => beam.end())
-
-let receivedData = false
-
-const indent = new Transform({
-	flush(cb) {
-		if (receivedData) {
-			blank()
-			write(SEPARATOR)
-		}
-		cb(undefined, '\n')
-	},
-	transform(chunk: Buffer, _encoding, cb) {
-		if (!receivedData) {
-			receivedData = true
-			write(SEPARATOR)
-			blank()
-		}
-		const lines = chunk.toString().replace(/^(?!$)/gm, INDENT)
-		cb(undefined, lines)
-	},
-})
-
-process.stdin.pipe(beam).pipe(indent).pipe(process.stdout)
-
-if (typeof process.stdin.unref === 'function') {
-	process.stdin.unref()
+	const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
+	const beam = new Beam(passphrase, beamOptions)
+	runBeamSession(beam, {
+		announceLabel: 'PASSPHRASE',
+		copyValue: copyToClipboard,
+		mode: beam.announce ? 'announce' : 'connect',
+		value: beam.announce ? beam.key : (passphrase ?? 'unknown'),
+	})
 }

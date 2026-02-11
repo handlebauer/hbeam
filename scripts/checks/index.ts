@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
+import { $ } from 'bun'
+
 /**
  * Run all code quality checks across the monorepo.
  *
  * Checks: TypeScript, linting, JSDoc, type locations.
  */
 import { TYPESCRIPT_RUNNER, runStep } from './utils'
-
-import { $ } from 'bun'
 
 const ARGV_OFFSET = 2
 const EXIT_FAILURE = 1

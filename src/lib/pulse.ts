@@ -2,8 +2,8 @@ import { bold, dim } from 'colorette'
 
 const INTERVAL_MS = 125
 const PEAK_A = 5
-const PEAK_B = 13
-const PEAK_WRAP = 20
+const PEAK_B = 15
+const PEAK_WRAP = 25
 const DIST_PEAK = 0
 const DIST_NEAR = 1
 
@@ -17,6 +17,8 @@ const RAW_FRAMES: readonly string[] = [
 	' ····',
 	'  ···',
 	'   ··',
+	'    ·',
+	'     ',
 	'    ·',
 	'   ··',
 	'  ···',

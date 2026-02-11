@@ -9,10 +9,37 @@ export interface BeamOptions {
 	announce?: boolean
 
 	/**
+	 * Explicit keypair to use for identity-based operation.
+	 * When omitted, key material is derived from the passphrase.
+	 */
+	keyPair?: KeyPair
+
+	/**
+	 * Explicit remote public key to dial in identity-based client mode.
+	 * When omitted, passphrase mode dials the derived public key.
+	 */
+	remotePublicKey?: Buffer
+
+	/**
 	 * An existing HyperDHT node to reuse.
 	 * If omitted, an ephemeral node is created and destroyed with the beam.
 	 */
 	dht?: HyperDHTNode
+}
+
+/** A saved peer entry in the local address book. */
+export interface Peer {
+	addedAt: string
+	publicKey: string
+}
+
+/** Name-keyed map of saved peers. */
+export type AddressBook = Record<string, Peer>
+
+/** Serialized identity persisted on disk. */
+export interface Identity {
+	publicKey: string
+	secretKey: string
 }
 
 /**

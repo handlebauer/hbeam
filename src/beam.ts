@@ -44,6 +44,9 @@ export class Beam extends Duplex {
 	private server: HyperDHTServer | undefined = undefined
 	private inbound: EncryptedSocket | undefined = undefined
 	private outbound: EncryptedSocket | undefined = undefined
+	private readonly keyPairOverride: KeyPair | undefined
+	private readonly remotePublicKeyOverride: Buffer | undefined
+	private readonly openInboundFirewall: boolean
 
 	private openCallback: StreamCallback | undefined = undefined
 	private readCallback: StreamCallback | undefined = undefined
@@ -54,8 +57,9 @@ export class Beam extends Duplex {
 
 		let key: string | undefined = undefined
 		let opts: BeamOptions = {}
+		const passphraseWasProvided = typeof keyOrOptions === 'string'
 
-		if (typeof keyOrOptions === 'string') {
+		if (passphraseWasProvided) {
 			key = keyOrOptions
 			opts = options ?? {}
 		} else {
@@ -63,14 +67,23 @@ export class Beam extends Duplex {
 		}
 
 		let shouldAnnounce = opts.announce ?? false
-		if (!key) {
+
+		if (!key && !opts.keyPair) {
 			key = toBase32(randomBytes(KEY_SEED_BYTES))
 			shouldAnnounce = true
+		} else if (!key && opts.keyPair) {
+			key = opts.keyPair.publicKey.toString('hex')
+		}
+		if (!key) {
+			throw new Error('Missing key material')
 		}
 
 		this.key = key
 		this.announce = shouldAnnounce
 		this.node = (opts.dht as HyperDHTNode) ?? undefined
+		this.keyPairOverride = opts.keyPair
+		this.remotePublicKeyOverride = opts.remotePublicKey
+		this.openInboundFirewall = !passphraseWasProvided && opts.keyPair !== undefined
 	}
 
 	/** Whether a peer connection has been established. */
@@ -82,7 +95,7 @@ export class Beam extends Duplex {
 
 	override async _open(cb: StreamCallback): Promise<void> {
 		this.openCallback = cb
-		const keyPair = deriveKeyPair(this.key)
+		const keyPair = this.keyPairOverride ?? deriveKeyPair(this.key)
 		this.node ??= createNode()
 
 		if (this.announce) {
@@ -140,7 +153,10 @@ export class Beam extends Duplex {
 	// Connection setup
 
 	private async listenAsServer(keyPair: KeyPair): Promise<void> {
-		this.server = this.node!.createServer({ firewall: createFirewall(keyPair) })
+		const serverOptions = this.openInboundFirewall
+			? undefined
+			: { firewall: createFirewall(keyPair) }
+		this.server = this.node!.createServer(serverOptions)
 		this.server.on('connection', (socket: EncryptedSocket) => this.handleConnection(socket))
 
 		try {
@@ -153,7 +169,8 @@ export class Beam extends Duplex {
 	}
 
 	private async connectAsClient(keyPair: KeyPair): Promise<void> {
-		const socket: EncryptedSocket = this.node!.connect(keyPair.publicKey, { keyPair })
+		const remotePublicKey = this.remotePublicKeyOverride ?? keyPair.publicKey
+		const socket: EncryptedSocket = this.node!.connect(remotePublicKey, { keyPair })
 
 		try {
 			await awaitOpen(socket)
