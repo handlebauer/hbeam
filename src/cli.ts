@@ -16,6 +16,7 @@ import { bold, cyan, dim, log, write, writeBlock } from '@/lib/log.ts'
 import { runBeamSession } from '@/lib/session.ts'
 
 import { Beam } from './beam.ts'
+import { runBindCommand } from './commands/bind.ts'
 import { runConnectCommand } from './commands/connect.ts'
 import { runPeersCommand } from './commands/peers.ts'
 import { runServeCommand } from './commands/serve.ts'
@@ -29,9 +30,9 @@ const EXIT_SUCCESS = 0
 const NO_INDENT = ''
 
 const argv = mri(process.argv.slice(ARGV_OFFSET), {
-	alias: { h: 'help', l: 'listen', o: 'output', v: 'version' },
+	alias: { h: 'help', l: 'listen', o: 'output', p: 'port', v: 'version' },
 	boolean: ['help', 'listen', 'version'],
-	string: ['output'],
+	string: ['host', 'output', 'port'],
 })
 
 if (argv.help) {
@@ -41,6 +42,7 @@ if (argv.help) {
 		`${bold('Usage:')}`,
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
 		`  hbeam connect ${dim('<name>')}`,
+		`  hbeam bind ${dim('<port|passphrase|name|public-key>')} ${dim('[options]')}`,
 		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
 		`  hbeam serve ${dim('<file>')} ${dim('[--listen]')}`,
 		`  hbeam whoami`,
@@ -48,6 +50,8 @@ if (argv.help) {
 		`${bold('Options:')}`,
 		`  ${dim('-l, --listen')}   Listen using passphrase or identity`,
 		`  ${dim('-o, --output')}   Save incoming file to a specific path`,
+		`  ${dim('-p, --port')}     Local listen port (bind forward mode)`,
+		`  ${dim('--host')}         Host target/listen host (bind mode)`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
 		'',
@@ -67,6 +71,12 @@ if (argv.help) {
 		`  ${dim('# Save and connect to peers by name')}`,
 		'  hbeam peers add workserver <public-key>',
 		'  hbeam connect workserver',
+		'',
+		`  ${dim('# Expose local port 3000 over P2P')}`,
+		'  hbeam bind 3000 --listen',
+		'',
+		`  ${dim('# Create local TCP tunnel to remote peer')}`,
+		'  hbeam bind workserver -p 8080',
 		'',
 		`  ${dim('# Serve a single file')}`,
 		'  hbeam serve ./report.pdf',
@@ -88,6 +98,10 @@ if (firstArg === 'peers') {
 }
 if (firstArg === 'connect') {
 	await runConnectCommand(restArgs, { outputPath: argv.output })
+	ranSubcommand = true
+}
+if (firstArg === 'bind') {
+	await runBindCommand(restArgs, { host: argv.host, listen: argv.listen, port: argv.port })
 	ranSubcommand = true
 }
 if (firstArg === 'serve') {

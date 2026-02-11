@@ -98,6 +98,64 @@ export interface HyperDHTServer {
 	close(): Promise<void>
 }
 
+/** Connection lifecycle events emitted by tunnel controllers. */
+export interface TunnelEventMap {
+	/** Emitted when a tunnel connection has been established. */
+	connect: (event: TunnelConnectionEvent) => void
+	/** Emitted when a tunnel connection has closed. */
+	disconnect: (event: TunnelConnectionEvent) => void
+	/** Emitted when a tunnel connection fails or a server-level error occurs. */
+	error: (error: Error) => void
+}
+
+/** Metadata emitted with tunnel connection lifecycle events. */
+export interface TunnelConnectionEvent {
+	/** Number of currently active tunneled sockets. */
+	activeConnections: number
+	/** Remote P2P public key in hex when available. */
+	remotePublicKey?: string
+}
+
+/** Common options used by forward/reverse tunnel constructors. */
+export interface TunnelOptions {
+	/** Local keypair used for DHT announce/connect authentication. */
+	keyPair: KeyPair
+	/** Optional existing DHT node to reuse. */
+	dht?: HyperDHTNode
+}
+
+/** Options for creating a reverse tunnel (P2P -> local TCP service). */
+export interface ReverseTunnelOptions extends TunnelOptions {
+	/** Local TCP host receiving forwarded traffic. */
+	host: string
+	/** Local TCP port receiving forwarded traffic. */
+	port: number
+}
+
+/** Options for creating a forward tunnel (local TCP -> P2P peer). */
+export interface ForwardTunnelOptions extends TunnelOptions {
+	/** Remote peer public key to dial over DHT. */
+	remotePublicKey: Buffer
+	/** Local TCP listen port for incoming client connections. */
+	port: number
+	/** Local TCP listen host. */
+	host?: string
+}
+
+/** Runtime controller returned by tunnel constructors. */
+export interface TunnelController {
+	/** Current count of active proxied connections. */
+	readonly connections: number
+	/** Local TCP listen host when applicable (forward mode). */
+	readonly listenHost?: string
+	/** Local TCP listen port when applicable (forward mode). */
+	readonly listenPort?: number
+	/** Close all listeners/sockets and release resources. */
+	close(): Promise<void>
+	/** Subscribe to tunnel lifecycle events. */
+	on<K extends keyof TunnelEventMap>(event: K, handler: TunnelEventMap[K]): this
+}
+
 /**
  * Event map documenting the events a Beam instance emits.
  *

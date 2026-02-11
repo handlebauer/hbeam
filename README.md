@@ -99,6 +99,46 @@ hbeam whoami
   a1b2c3d4e5f6...
 ```
 
+### Bind — TCP tunnels over P2P
+
+Expose a local TCP service to a remote peer:
+
+```bash
+# Reverse proxy: expose localhost:3000 with a one-time passphrase
+hbeam bind 3000
+
+# Reverse proxy: expose using your persistent identity
+hbeam bind 3000 --listen
+```
+
+```
+  HBEAM ···
+
+  ANNOUNCING
+  nbsk4wlqmfuw...
+  ONLINE [96.9.225.80:34725]
+  FORWARDING localhost:3000
+```
+
+Access a remote peer's service locally:
+
+```bash
+# Forward proxy: connect to a saved peer, listen on local port 8080
+hbeam bind workserver -p 8080
+
+# Forward proxy: connect by passphrase
+hbeam bind <passphrase> -p 8080
+```
+
+```
+  HBEAM ···
+
+  CONNECTING workserver
+  LISTENING 127.0.0.1:8080
+```
+
+Any TCP traffic (HTTP, SSH, databases, etc.) can be tunneled. Both sides are end-to-end encrypted via Noise.
+
 ### Serve a single file
 
 Serve one file over an encrypted hbeam session:
@@ -131,6 +171,8 @@ hbeam <passphrase> > report.pdf
 ```
 -l, --listen   Listen using passphrase or identity
 -o, --output   Save incoming file to a specific path
+-p, --port     Local listen port (bind forward mode)
+--host         Target/listen host (bind mode, default: localhost)
 -h, --help     Show help
 -v, --version  Show version
 ```

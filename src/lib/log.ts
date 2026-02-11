@@ -14,6 +14,7 @@ const CLEAR_LINE = '\r\u001B[2K'
 // eslint-disable-next-line no-control-regex
 const ANSI_ESCAPE = /\u001B\[[0-9;]*m/g
 const NO_OFFSET = 0
+const FIRST_FRAME_INDEX = 1
 const DEFAULT_COLUMNS = 80
 const MIN_LINES = 1
 
@@ -173,7 +174,7 @@ export interface Spinner {
  */
 export function createSpinner(frames: readonly string[], intervalMs: number): Spinner {
 	let offset = NO_OFFSET
-	let frameIndex = NO_OFFSET
+	let frameIndex = frames.length > FIRST_FRAME_INDEX ? FIRST_FRAME_INDEX : NO_OFFSET
 	let timer: ReturnType<typeof globalThis.setInterval> | undefined = undefined
 
 	/**

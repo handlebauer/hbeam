@@ -11,11 +11,23 @@ import { createHash } from 'node:crypto'
 import * as b4a from 'b4a'
 import DHT from 'hyperdht'
 
+import { getPeer } from './addressbook.ts'
 import { fromBase32 } from './encoding.ts'
 
 import type { EncryptedSocket, HyperDHTNode, KeyPair } from '../types.ts'
 
 const KEY_SEED_BYTES = 32
+const PUBLIC_KEY_BYTES = 32
+
+/**
+ * Check whether a string is a lowercase/uppercase 64-char hex public key.
+ *
+ * @param value - Candidate public key string.
+ * @returns True when valid hex public key text.
+ */
+function isPublicKeyHex(value: string): boolean {
+	return /^[0-9a-f]{64}$/i.test(value.trim())
+}
 
 /**
  * Normalize an arbitrary decoded seed into exactly 32 bytes.
@@ -77,4 +89,37 @@ export function awaitOpen(socket: EncryptedSocket): Promise<void> {
  */
 export function createFirewall(keyPair: KeyPair): (remotePublicKey: Buffer) => boolean {
 	return (remotePublicKey: Buffer) => !b4a.equals(remotePublicKey, keyPair.publicKey)
+}
+
+/**
+ * Resolve a peer target string to a remote public key.
+ *
+ * Resolution order:
+ * 1) raw 64-char hex public key
+ * 2) saved peer name in address book
+ * 3) passphrase-derived keypair public key
+ *
+ * @param target - Hex key, address-book name, or passphrase.
+ * @returns Resolved 32-byte remote public key.
+ */
+export async function resolveRemoteKey(target: string): Promise<Buffer> {
+	const normalized = target.trim()
+
+	if (isPublicKeyHex(normalized)) {
+		const key = Buffer.from(normalized, 'hex')
+		if (key.length === PUBLIC_KEY_BYTES) {
+			return key
+		}
+	}
+
+	const peer = await getPeer(normalized).catch(() => undefined)
+
+	if (peer) {
+		const key = Buffer.from(peer.publicKey, 'hex')
+		if (key.length === PUBLIC_KEY_BYTES) {
+			return key
+		}
+	}
+
+	return deriveKeyPair(normalized).publicKey
 }
