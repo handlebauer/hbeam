@@ -175,5 +175,4 @@ if (isAlpha) {
 }
 
 const duration = ((Date.now() - startTimeMs) / MILLISECONDS_PER_SECOND).toFixed(DURATION_DECIMALS)
-console.log()
-console.log(`Published in ${duration}s!`)
+await runStep(`Published in ${duration}s!`)
