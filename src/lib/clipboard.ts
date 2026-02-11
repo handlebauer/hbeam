@@ -1,3 +1,10 @@
+/**
+ * Cross-platform clipboard integration for terminal workflows.
+ *
+ * Tries common platform-native clipboard commands in priority order.
+ *
+ * @module
+ */
 import { spawnSync } from 'node:child_process'
 
 type ClipboardCommand = Readonly<{
@@ -17,6 +24,11 @@ const LINUX_COMMANDS: readonly ClipboardCommand[] = [
 	{ args: ['--clipboard', '--input'], command: 'xsel' },
 ]
 
+/**
+ * Resolve the clipboard command list for the current platform.
+ *
+ * @returns Ordered command list to try for clipboard writes.
+ */
 function getClipboardCommands(): readonly ClipboardCommand[] {
 	if (process.platform === 'darwin') {
 		return DARWIN_COMMANDS
@@ -27,6 +39,13 @@ function getClipboardCommands(): readonly ClipboardCommand[] {
 	return LINUX_COMMANDS
 }
 
+/**
+ * Attempt to write text to clipboard with a specific command.
+ *
+ * @param text - Text to place in clipboard.
+ * @param item - Clipboard command and argument tuple.
+ * @returns True when command succeeds.
+ */
 function tryClipboardCommand(text: string, item: ClipboardCommand): boolean {
 	const result = spawnSync(item.command, item.args, {
 		input: text,
@@ -35,7 +54,12 @@ function tryClipboardCommand(text: string, item: ClipboardCommand): boolean {
 	return !result.error && result.status === EXIT_SUCCESS
 }
 
-/** Copy text to the system clipboard using common platform commands. */
+/**
+ * Copy text to the system clipboard using common platform commands.
+ *
+ * @param text - Text to copy.
+ * @returns True when at least one command succeeds.
+ */
 export function copyToClipboard(text: string): boolean {
 	for (const item of getClipboardCommands()) {
 		if (tryClipboardCommand(text, item)) {

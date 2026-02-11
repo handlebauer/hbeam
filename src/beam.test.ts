@@ -1,3 +1,10 @@
+/**
+ * Unit tests for Beam constructor and key derivation behavior.
+ *
+ * Covers identity-mode key display and generated passphrase announce defaults.
+ *
+ * @module
+ */
 import { test, expect } from 'bun:test'
 
 import { Beam } from './beam.ts'

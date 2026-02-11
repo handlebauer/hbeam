@@ -1,3 +1,10 @@
+/**
+ * Unit tests for identity persistence lifecycle.
+ *
+ * Verifies first-run creation and subsequent reuse semantics.
+ *
+ * @module
+ */
 import { test, expect } from 'bun:test'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'

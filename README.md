@@ -99,10 +99,38 @@ hbeam whoami
   a1b2c3d4e5f6...
 ```
 
+### Serve a single file
+
+Serve one file over an encrypted hbeam session:
+
+```bash
+hbeam serve ./report.pdf
+```
+
+This announces a one-time passphrase by default. To serve from your persistent identity instead:
+
+```bash
+hbeam serve ./report.pdf --listen
+```
+
+On the receiving side, connect normally (`hbeam <passphrase>` or `hbeam connect <name>`). hbeam detects the incoming file header and prompts where to save it. Use `-o` to skip the prompt:
+
+```bash
+hbeam <passphrase> -o ./downloads/report.pdf
+hbeam connect workserver -o ./downloads/report.pdf
+```
+
+If stdout is piped, hbeam writes raw file bytes to stdout so shell redirection works:
+
+```bash
+hbeam <passphrase> > report.pdf
+```
+
 ### Options
 
 ```
 -l, --listen   Listen using passphrase or identity
+-o, --output   Save incoming file to a specific path
 -h, --help     Show help
 -v, --version  Show version
 ```

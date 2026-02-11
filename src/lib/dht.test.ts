@@ -1,3 +1,10 @@
+/**
+ * Unit tests for DHT key-derivation normalization behavior.
+ *
+ * Ensures passphrase-to-keypair derivation is runtime-stable and deterministic.
+ *
+ * @module
+ */
 import { test, expect } from 'bun:test'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'

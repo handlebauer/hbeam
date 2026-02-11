@@ -1,3 +1,10 @@
+/**
+ * `hbeam peers` command implementation.
+ *
+ * Provides add/remove/list subcommands for managing the local peer address book.
+ *
+ * @module
+ */
 import { addPeer, getPeer, listPeers, removePeer } from '@/lib/addressbook.ts'
 import { blank, bold, cyan, dim, log, logError, write } from '@/lib/log.ts'
 import { confirm } from '@/lib/prompt.ts'
@@ -16,6 +23,12 @@ const SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY
 const SECONDS_PER_WEEK = SECONDS_PER_DAY * DAYS_PER_WEEK
 const EMPTY_PEERS = 0
 
+/**
+ * Convert an ISO timestamp into a compact relative-age label.
+ *
+ * @param addedAt - ISO timestamp string.
+ * @returns Relative age label (for example, `2h ago`).
+ */
 function formatAge(addedAt: string): string {
 	const then = Date.parse(addedAt)
 
@@ -44,10 +57,21 @@ function formatAge(addedAt: string): string {
 	return `${Math.floor(seconds / SECONDS_PER_WEEK)}w ago`
 }
 
+/**
+ * Shorten a full public key for compact terminal display.
+ *
+ * @param publicKey - Full hex public key.
+ * @returns Truncated key prefix with ellipsis.
+ */
 function shortenKey(publicKey: string): string {
 	return `${publicKey.slice(START_INDEX, PUBLIC_KEY_PREFIX_LENGTH)}...`
 }
 
+/**
+ * Print usage guidance for `hbeam peers`.
+ *
+ * @returns Nothing.
+ */
 function usage(): void {
 	logError('Invalid peers command.')
 	write(dim('Usage: hbeam peers add <name> <public-key>'))
@@ -55,6 +79,13 @@ function usage(): void {
 	write(dim('       hbeam peers ls'))
 }
 
+/**
+ * Handle `hbeam peers add <name> <public-key>`.
+ *
+ * @param name - Peer alias.
+ * @param publicKey - Hex public key.
+ * @returns Process exit code.
+ */
 async function handleAdd(name: string | undefined, publicKey: string | undefined): Promise<number> {
 	if (!name || !publicKey) {
 		blank()
@@ -80,6 +111,12 @@ async function handleAdd(name: string | undefined, publicKey: string | undefined
 	return EXIT_SUCCESS
 }
 
+/**
+ * Handle `hbeam peers rm <name>`.
+ *
+ * @param name - Peer alias.
+ * @returns Process exit code.
+ */
 async function handleRemove(name: string | undefined): Promise<number> {
 	if (!name) {
 		blank()
@@ -113,6 +150,11 @@ async function handleRemove(name: string | undefined): Promise<number> {
 	return EXIT_SUCCESS
 }
 
+/**
+ * Handle `hbeam peers ls`.
+ *
+ * @returns Process exit code.
+ */
 async function handleList(): Promise<number> {
 	const peers = await listPeers()
 
@@ -136,7 +178,12 @@ async function handleList(): Promise<number> {
 	return EXIT_SUCCESS
 }
 
-/** Execute `hbeam peers` subcommands. */
+/**
+ * Execute `hbeam peers` subcommands.
+ *
+ * @param argv - Positional command arguments after `peers`.
+ * @returns Process exit code.
+ */
 export async function runPeersCommand(argv: string[]): Promise<number> {
 	const [action, name, publicKey] = argv
 

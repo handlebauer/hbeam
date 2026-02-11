@@ -1,3 +1,11 @@
+/**
+ * Core Beam duplex stream implementation built on HyperDHT sockets.
+ *
+ * Handles announce/connect setup, socket wiring, streamx lifecycle hooks,
+ * and connection event emission for CLI and library consumers.
+ *
+ * @module
+ */
 import queueTick from 'queue-tick'
 import { Duplex } from 'streamx'
 
@@ -52,6 +60,12 @@ export class Beam extends Duplex {
 	private readCallback: StreamCallback | undefined = undefined
 	private drainCallback: StreamCallback | undefined = undefined
 
+	/**
+	 * Create a new beam instance in announce or connect mode.
+	 *
+	 * @param keyOrOptions - Passphrase or options object.
+	 * @param options - Options used when a passphrase is provided.
+	 */
 	constructor(keyOrOptions?: string | BeamOptions, options?: BeamOptions) {
 		super()
 
@@ -86,13 +100,23 @@ export class Beam extends Duplex {
 		this.openInboundFirewall = !passphraseWasProvided && opts.keyPair !== undefined
 	}
 
-	/** Whether a peer connection has been established. */
+	/**
+	 * Whether a peer connection has been established.
+	 *
+	 * @returns True when outbound socket has been created.
+	 */
 	get connected(): boolean {
 		return this.outbound !== undefined
 	}
 
 	// Streamx lifecycle
 
+	/**
+	 * Streamx open hook: initialize DHT node and start announce/connect flow.
+	 *
+	 * @param cb - Open callback from streamx.
+	 * @returns Promise that resolves when setup path completes.
+	 */
 	override async _open(cb: StreamCallback): Promise<void> {
 		this.openCallback = cb
 		const keyPair = this.keyPairOverride ?? deriveKeyPair(this.key)
@@ -105,11 +129,24 @@ export class Beam extends Duplex {
 		}
 	}
 
+	/**
+	 * Streamx read hook: resume inbound flow when consumer requests data.
+	 *
+	 * @param cb - Read callback from streamx.
+	 * @returns Nothing.
+	 */
 	override _read(cb: StreamCallback): void {
 		this.readCallback = cb
 		this.inbound?.resume()
 	}
 
+	/**
+	 * Streamx write hook: write outbound bytes, respecting backpressure.
+	 *
+	 * @param data - Data chunk to send.
+	 * @param cb - Write callback from streamx.
+	 * @returns Nothing.
+	 */
 	override _write(data: unknown, cb: StreamCallback): void {
 		if (this.outbound!.write(data as Buffer) !== false) {
 			cb()
@@ -118,7 +155,18 @@ export class Beam extends Duplex {
 		this.drainCallback = cb
 	}
 
+	/**
+	 * Streamx final hook: end outbound socket and resolve when flushed.
+	 *
+	 * @param cb - Final callback from streamx.
+	 * @returns Nothing.
+	 */
 	override _final(cb: StreamCallback): void {
+		/**
+		 * Resolve the final callback once outbound finish/error fires.
+		 *
+		 * @returns Nothing.
+		 */
 		const done = (): void => {
 			this.outbound!.removeListener('finish', done)
 			this.outbound!.removeListener('error', done)
@@ -129,6 +177,11 @@ export class Beam extends Duplex {
 		this.outbound!.on('error', done)
 	}
 
+	/**
+	 * Streamx pre-destroy hook: tear down sockets and pending callbacks.
+	 *
+	 * @returns Nothing.
+	 */
 	override _predestroy(): void {
 		this.inbound?.destroy()
 		this.outbound?.destroy()
@@ -138,6 +191,12 @@ export class Beam extends Duplex {
 		this.resolveDrain(error)
 	}
 
+	/**
+	 * Streamx destroy hook: close DHT server/node resources.
+	 *
+	 * @param cb - Destroy callback from streamx.
+	 * @returns Promise that resolves after cleanup.
+	 */
 	override async _destroy(cb: StreamCallback): Promise<void> {
 		if (!this.node) {
 			cb()
@@ -152,6 +211,12 @@ export class Beam extends Duplex {
 
 	// Connection setup
 
+	/**
+	 * Start announce/listen mode with optional inbound firewall.
+	 *
+	 * @param keyPair - Local keypair used for server listen.
+	 * @returns Promise that resolves when listen path completes.
+	 */
 	private async listenAsServer(keyPair: KeyPair): Promise<void> {
 		const serverOptions = this.openInboundFirewall
 			? undefined
@@ -168,6 +233,12 @@ export class Beam extends Duplex {
 		this.emitRemoteAddress()
 	}
 
+	/**
+	 * Start client mode by dialing a remote public key.
+	 *
+	 * @param keyPair - Local keypair used for dial auth.
+	 * @returns Promise that resolves when connect path completes.
+	 */
 	private async connectAsClient(keyPair: KeyPair): Promise<void> {
 		const remotePublicKey = this.remotePublicKeyOverride ?? keyPair.publicKey
 		const socket: EncryptedSocket = this.node!.connect(remotePublicKey, { keyPair })
@@ -182,6 +253,12 @@ export class Beam extends Duplex {
 		this.handleConnection(socket)
 	}
 
+	/**
+	 * Bind socket handlers for inbound/outbound stream integration.
+	 *
+	 * @param socket - Encrypted socket from HyperDHT.
+	 * @returns Nothing.
+	 */
 	private handleConnection(socket: EncryptedSocket): void {
 		socket.on('data', (data: Buffer) => {
 			if (!this.inbound) {
@@ -215,17 +292,33 @@ export class Beam extends Duplex {
 
 	// Helpers
 
+	/**
+	 * Push inbound data into streamx and schedule read callback resolution.
+	 *
+	 * @param data - Data chunk or end-of-stream marker.
+	 * @returns Push backpressure result from streamx.
+	 */
 	private pushData(data: Buffer | null): boolean {
 		const result = this.push(data)
 		queueTick(() => this.resolveRead())
 		return result
 	}
 
+	/**
+	 * Push end-of-stream marker into streamx.
+	 *
+	 * @returns Nothing.
+	 */
 	private pushEndOfStream(): void {
 		// oxlint-disable-next-line unicorn/no-null
 		this.pushData(null)
 	}
 
+	/**
+	 * Emit current node host/port information.
+	 *
+	 * @returns Nothing.
+	 */
 	private emitRemoteAddress(): void {
 		this.emit('remote-address', {
 			host: this.node!.host,
@@ -233,6 +326,12 @@ export class Beam extends Duplex {
 		} satisfies ConnectionInfo)
 	}
 
+	/**
+	 * Resolve the pending open callback, if any.
+	 *
+	 * @param error - Optional error to pass to callback.
+	 * @returns Nothing.
+	 */
 	private resolveOpen(error?: Error): void {
 		const cb = this.openCallback
 		if (cb) {
@@ -241,6 +340,12 @@ export class Beam extends Duplex {
 		}
 	}
 
+	/**
+	 * Resolve the pending read callback, if any.
+	 *
+	 * @param error - Optional error to pass to callback.
+	 * @returns Nothing.
+	 */
 	private resolveRead(error?: Error): void {
 		const cb = this.readCallback
 		if (cb) {
@@ -249,6 +354,12 @@ export class Beam extends Duplex {
 		}
 	}
 
+	/**
+	 * Resolve the pending drain callback, if any.
+	 *
+	 * @param error - Optional error to pass to callback.
+	 * @returns Nothing.
+	 */
 	private resolveDrain(error?: Error): void {
 		const cb = this.drainCallback
 		if (cb) {

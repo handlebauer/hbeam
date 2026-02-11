@@ -1,3 +1,10 @@
+/**
+ * Session lifecycle controller for graceful shutdown behavior.
+ *
+ * Encapsulates SIGINT handling, spinner teardown, and timed beam destruction.
+ *
+ * @module
+ */
 import { blank, clearLine, dim, log } from './log.ts'
 
 import type { Beam } from '../beam.ts'
@@ -18,10 +25,19 @@ export interface Lifecycle {
  *
  * Registers a one-shot SIGINT handler on creation. All shutdown state is
  * encapsulated — callers just check `done()` and call `shutdown()`.
+ *
+ * @param beam - Active beam instance to destroy during shutdown.
+ * @param spinner - Optional spinner handle to stop during shutdown.
+ * @returns Lifecycle controller with `done` and `shutdown`.
  */
 export function createLifecycle(beam: Beam, spinner?: { stop(): void }): Lifecycle {
 	let isShuttingDown = false
 
+	/**
+	 * Start graceful teardown and register a forced-exit timeout.
+	 *
+	 * @returns Nothing.
+	 */
 	function shutdown(): void {
 		if (isShuttingDown) {
 			return

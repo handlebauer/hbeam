@@ -1,3 +1,10 @@
+/**
+ * Unit tests for address book persistence and validation logic.
+ *
+ * Verifies CRUD behavior and input validation guarantees for peer records.
+ *
+ * @module
+ */
 import { test, expect } from 'bun:test'
 
 import { withTempHome, importFresh } from '@test/env.ts'

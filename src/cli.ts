@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+/**
+ * Command-line entrypoint for the hbeam executable.
+ *
+ * Parses CLI flags/arguments, routes to subcommands, and starts
+ * interactive announce/connect sessions for pipe and file-transfer flows.
+ *
+ * @module
+ */
 import mri from 'mri'
 
 import { copyToClipboard } from '@/lib/clipboard.ts'
@@ -10,6 +18,7 @@ import { runBeamSession } from '@/lib/session.ts'
 import { Beam } from './beam.ts'
 import { runConnectCommand } from './commands/connect.ts'
 import { runPeersCommand } from './commands/peers.ts'
+import { runServeCommand } from './commands/serve.ts'
 import { runWhoamiCommand } from './commands/whoami.ts'
 
 import type { BeamOptions } from './types.ts'
@@ -20,8 +29,9 @@ const EXIT_SUCCESS = 0
 const NO_INDENT = ''
 
 const argv = mri(process.argv.slice(ARGV_OFFSET), {
-	alias: { h: 'help', l: 'listen', v: 'version' },
+	alias: { h: 'help', l: 'listen', o: 'output', v: 'version' },
 	boolean: ['help', 'listen', 'version'],
+	string: ['output'],
 })
 
 if (argv.help) {
@@ -32,10 +42,12 @@ if (argv.help) {
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
 		`  hbeam connect ${dim('<name>')}`,
 		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
+		`  hbeam serve ${dim('<file>')} ${dim('[--listen]')}`,
 		`  hbeam whoami`,
 		'',
 		`${bold('Options:')}`,
 		`  ${dim('-l, --listen')}   Listen using passphrase or identity`,
+		`  ${dim('-o, --output')}   Save incoming file to a specific path`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
 		'',
@@ -55,6 +67,9 @@ if (argv.help) {
 		`  ${dim('# Save and connect to peers by name')}`,
 		'  hbeam peers add workserver <public-key>',
 		'  hbeam connect workserver',
+		'',
+		`  ${dim('# Serve a single file')}`,
+		'  hbeam serve ./report.pdf',
 	])
 	process.exit(EXIT_SUCCESS)
 }
@@ -72,7 +87,11 @@ if (firstArg === 'peers') {
 	process.exit(await runPeersCommand(restArgs))
 }
 if (firstArg === 'connect') {
-	await runConnectCommand(restArgs)
+	await runConnectCommand(restArgs, { outputPath: argv.output })
+	ranSubcommand = true
+}
+if (firstArg === 'serve') {
+	await runServeCommand(restArgs, { listen: argv.listen })
 	ranSubcommand = true
 }
 if (firstArg === 'whoami') {
@@ -106,6 +125,7 @@ if (!ranSubcommand) {
 			announceLabel: 'PASSPHRASE',
 			copyValue: copyToClipboard,
 			mode: beam.announce ? 'announce' : 'connect',
+			outputPath: argv.output,
 			value: beam.announce ? beam.key : (passphrase ?? 'unknown'),
 		})
 	}

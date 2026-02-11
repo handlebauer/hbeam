@@ -1,3 +1,10 @@
+/**
+ * Spinner frame generation for the hbeam pulse animation.
+ *
+ * Produces styled frame sequences with brightness gradients for terminal UI.
+ *
+ * @module
+ */
 import { bold, dim } from 'colorette'
 
 const INTERVAL_MS = 125

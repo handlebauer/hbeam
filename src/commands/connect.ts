@@ -1,3 +1,11 @@
+/**
+ * `hbeam connect` command implementation.
+ *
+ * Resolves named peers from the address book, ensures local identity exists,
+ * and starts a connect-mode session against the peer public key.
+ *
+ * @module
+ */
 import { getPeer } from '@/lib/addressbook.ts'
 import { loadOrCreateIdentityWithMeta } from '@/lib/identity.ts'
 import { blank, cyan, dim, log, logError, write } from '@/lib/log.ts'
@@ -8,8 +16,21 @@ import { Beam } from '../beam.ts'
 const EXIT_FAILURE = 1
 const PUBLIC_KEY_BYTES = 32
 
-/** Execute `hbeam connect <name>`. Exits on error; stays alive for the session. */
-export async function runConnectCommand(argv: string[]): Promise<void> {
+interface ConnectCommandOptions {
+	outputPath?: string
+}
+
+/**
+ * Execute `hbeam connect <name>`.
+ *
+ * @param argv - Positional command arguments after `connect`.
+ * @param options - Optional command flags.
+ * @returns Promise that resolves when the command has started the session.
+ */
+export async function runConnectCommand(
+	argv: string[],
+	options: ConnectCommandOptions = {},
+): Promise<void> {
 	const [name] = argv
 	if (!name) {
 		blank()
@@ -49,6 +70,7 @@ export async function runConnectCommand(argv: string[]): Promise<void> {
 
 	runBeamSession(beam, {
 		mode: 'connect',
+		outputPath: options.outputPath,
 		value: name,
 	})
 }

@@ -1,6 +1,6 @@
 {
 	"name": "hbeam",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "A 1-to-1 end-to-end encrypted pipe over HyperDHT.",
 	"keywords": [
 		"cli",

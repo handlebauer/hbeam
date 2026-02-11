@@ -1,18 +1,40 @@
+/**
+ * Byte/string encoding helpers for hbeam key material.
+ *
+ * Provides base32 conversion helpers and secure random byte generation.
+ *
+ * @module
+ */
 import * as b4a from 'b4a'
 import b32 from 'hi-base32'
 import sodium from 'sodium-universal'
 
-/** Encode a buffer as a lowercase base32 string without padding. */
+/**
+ * Encode a buffer as a lowercase base32 string without padding.
+ *
+ * @param buf - Raw bytes to encode.
+ * @returns Base32-encoded string without trailing `=` padding.
+ */
 export function toBase32(buf: Buffer): string {
 	return b32.encode(buf).replace(/=/g, '').toLowerCase()
 }
 
-/** Decode a base32 string back into a raw Buffer. */
+/**
+ * Decode a base32 string back into a raw buffer.
+ *
+ * @param str - Base32-encoded input string.
+ * @returns Decoded raw bytes.
+ */
 export function fromBase32(str: string): Buffer {
 	return b4a.from(b32.decode.asBytes(str.toUpperCase()))
 }
 
-/** Generate cryptographically secure random bytes. */
+/**
+ * Generate cryptographically secure random bytes.
+ *
+ * @param length - Number of bytes to generate.
+ * @returns Random byte buffer with the requested length.
+ */
 export function randomBytes(length: number): Buffer {
 	const buffer = b4a.alloc(length)
 	sodium.randombytes_buf(buffer)
