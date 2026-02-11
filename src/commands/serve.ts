@@ -22,15 +22,17 @@ import { loadOrCreateIdentityWithMeta } from '@/lib/identity.ts'
 import { createLifecycle } from '@/lib/lifecycle.ts'
 import {
 	blank,
-	bold,
 	createSpinner,
 	cyan,
 	dim,
 	gray,
+	green,
 	log,
 	logError,
 	red,
 	write,
+	endInline,
+	writeInline,
 } from '@/lib/log.ts'
 import { createPulseFrames } from '@/lib/pulse.ts'
 
@@ -73,7 +75,7 @@ async function resolveServeIdentity(listen: boolean | undefined): Promise<{
 	keyPair?: KeyPair
 }> {
 	if (!listen) {
-		return { announceLabel: 'PASSPHRASE' }
+		return { announceLabel: 'ANNOUNCING' }
 	}
 	const identity = await loadOrCreateIdentityWithMeta()
 	if (identity.created) {
@@ -82,7 +84,7 @@ async function resolveServeIdentity(listen: boolean | undefined): Promise<{
 		write(cyan(identity.keyPair.publicKey.toString('hex')))
 	}
 	return {
-		announceLabel: 'PUBLIC KEY',
+		announceLabel: 'ANNOUNCING',
 		keyPair: identity.keyPair,
 	}
 }
@@ -149,7 +151,6 @@ export async function runServeCommand(
 	spinner.blank()
 	spinner.write(dim(identity.announceLabel))
 	spinner.write(cyan(beam.key))
-	spinner.write(dim(`FILE ${fileName} (${formatFileSize(fileStat.size)})`))
 
 	copyToClipboard(beam.key)
 
@@ -160,6 +161,9 @@ export async function runServeCommand(
 		if (host) {
 			spinner.write(dim(`ONLINE ${gray(`[${host}:${port}]`)}`))
 			spinner.blank()
+			spinner.write(`SERVING ${dim(`${fileName} (${formatFileSize(fileStat.size)})`)}`)
+
+			spinner.blank()
 		}
 	})
 
@@ -168,9 +172,7 @@ export async function runServeCommand(
 			return
 		}
 		spinner.stop()
-		log(bold('PIPE ACTIVE'))
-		write(gray('SENDING FILE'))
-		blank()
+		writeInline(`SENDING ${dim(`${fileName}...`)}`)
 
 		const header = encodeHeader({ name: fileName, size: fileStat.size, type: 'file' })
 		if (beam.write(header) === false) {
@@ -184,7 +186,7 @@ export async function runServeCommand(
 		spinner.stop()
 		const isPeerNotFound = error.message.includes('PEER_NOT_FOUND')
 		if (awaitingAck && error.message.includes('connection reset by peer')) {
-			logError('Receiver closed before completion acknowledgement.')
+			endInline(` ${dim('DISCONNECTED')}`)
 			blank()
 			closeTransfer()
 			return
@@ -225,9 +227,10 @@ export async function runServeCommand(
 			if (ack) {
 				awaitingAck = false
 				if (ack.ok) {
-					log(dim('RECEIVER CONFIRMED'))
+					endInline(` ${green('DONE')}`)
 				} else {
-					logError(`Receiver declined file${ack.reason ? `: ${ack.reason}` : '.'}`)
+					const reason = ack.reason === 'cancelled' ? 'CANCELLED' : 'DECLINED'
+					endInline(` ${dim(reason)}`)
 				}
 				blank()
 				closeTransfer()
@@ -238,13 +241,10 @@ export async function runServeCommand(
 
 	beam.on('end', () => beam.end())
 	beam.on('finish', () => {
-		log(dim('FILE SENT'))
-		write(dim('WAITING FOR RECEIVER ACK'))
-		blank()
 		awaitingAck = true
 		ackTimeout = globalThis.setTimeout(() => {
 			awaitingAck = false
-			logError('Timed out waiting for receiver acknowledgement.')
+			endInline(` ${dim('TIMED OUT')}`)
 			blank()
 			closeTransfer()
 		}, ACK_TIMEOUT_MS)

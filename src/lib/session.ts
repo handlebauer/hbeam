@@ -8,7 +8,7 @@
  */
 import { createWriteStream } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 
 import {
 	encodeCompletionAck,
@@ -24,13 +24,16 @@ import {
 	createSpinner,
 	cyan,
 	dim,
+	endInline,
 	gray,
+	green,
 	INDENT,
 	log,
 	logError,
 	red,
 	SEPARATOR,
 	write,
+	writeInline,
 } from './log.ts'
 import { confirm, input } from './prompt.ts'
 import { createPulseFrames } from './pulse.ts'
@@ -72,7 +75,7 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 	spinner.blank()
 
 	if (options.mode === 'announce') {
-		spinner.write(dim(options.announceLabel ?? 'PUBLIC KEY'))
+		spinner.write(dim(options.announceLabel ?? 'ANNOUNCING'))
 		spinner.write(cyan(options.value))
 		options.copyValue?.(options.value)
 	} else {
@@ -97,9 +100,12 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 		}
 
 		spinner.stop()
-		log(bold('PIPE ACTIVE'))
-		write(gray('CTRL+C TO TERMINATE'))
-		blank()
+
+		if (!process.stdin.isTTY) {
+			writeInline(bold('CONNECTED...'))
+		} else {
+			log(bold('CONNECTED'))
+		}
 	})
 
 	/**
@@ -111,6 +117,7 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 	 */
 	let receiveMode: ReceiveMode = 'unknown'
 	let receivedPipeData = false
+	let pipeFrameClosed = false
 	let awaitingPrompt = false
 	let streamDone = false
 	let streamTerminationHandled = false
@@ -144,13 +151,30 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 		}
 
 		fileStream.end(() => {
-			log(dim(`SAVED ${filePath ?? ''}`))
+			const absolutePath = filePath ?? ''
+			const displayPath = relative(process.cwd(), absolutePath) || absolutePath
+			log(`SAVED ${dim(displayPath)}`)
+
 			blank()
 			beam.write(encodeCompletionAck({ ok: true, type: 'file-complete' }))
 			beam.end()
 		})
 
 		fileStream = undefined
+	}
+
+	/**
+	 * Close the pipe-mode content frame with a trailing separator.
+	 * No-op if no pipe data was received or the frame is already closed.
+	 *
+	 * @returns Nothing.
+	 */
+	function closePipeFrame(): void {
+		if (!receivedPipeData || pipeFrameClosed) {
+			return
+		}
+		pipeFrameClosed = true
+		write(SEPARATOR)
 	}
 
 	/**
@@ -163,7 +187,6 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 		if (!receivedPipeData) {
 			receivedPipeData = true
 			write(SEPARATOR)
-			blank()
 		}
 
 		process.stdout.write(chunk.toString().replace(/^(?!$)/gm, INDENT))
@@ -192,13 +215,26 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 
 		if (receiveMode === 'file') {
 			finalizeFile()
-		} else if (receiveMode === 'file-stdout') {
-			beam.write(encodeCompletionAck({ ok: true, type: 'file-complete' }))
-			beam.end()
-		} else if (receiveMode === 'pipe' && receivedPipeData) {
-			blank()
-			write(SEPARATOR)
+			return
 		}
+
+		if (receiveMode === 'file-stdout') {
+			beam.write(encodeCompletionAck({ ok: true, type: 'file-complete' }))
+		} else {
+			closePipeFrame()
+
+			/** Confirm clean delivery unless shutdown is already in progress. */
+			if (!lifecycle.done()) {
+				if (!process.stdin.isTTY && !receivedPipeData) {
+					endInline(` ${green('DONE')}`)
+				} else {
+					log(dim('DONE'))
+				}
+				blank()
+			}
+		}
+
+		beam.end()
 	}
 
 	beam.on('end', onStreamDone)
@@ -215,6 +251,8 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 		) {
 			return
 		}
+
+		closePipeFrame()
 
 		if (isPeerNotFound) {
 			log(red(dim('PEER NOT FOUND')))
@@ -246,14 +284,15 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 			return undefined
 		}
 
-		const suggestedPath = resolve(process.cwd(), fileName)
-		const shouldSave = await confirm('Save incoming file?')
+		const shouldSave = await confirm('Save file?')
 
 		if (!shouldSave) {
 			return ''
 		}
 
-		return await input('Save to:', suggestedPath)
+		const chosen = await input('Save to:', `./${fileName}`)
+
+		return resolve(process.cwd(), chosen)
 	}
 
 	/**
@@ -267,7 +306,7 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 		const header = parseFileHeader(headerChunk.subarray(FIRST_INDEX, lineEnd))
 		const remainder = headerChunk.subarray(lineEnd + NEXT_OFFSET)
 
-		log(dim(`INCOMING FILE ${header.name} (${formatFileSize(header.size)})`))
+		log(`RECEIVED ${dim(`${header.name} (${formatFileSize(header.size)})`)}`)
 
 		process.stdin.unpipe(beam)
 		keepAlive = globalThis.setInterval(() => {}, KEEPALIVE_MS)
@@ -278,7 +317,7 @@ export function runBeamSession(beam: Beam, options: SessionOptions): void {
 
 		if (outputPath === '') {
 			clearKeepAlive()
-			log(dim('RECEIVE CANCELLED'))
+			log(dim('CANCELLED'))
 			blank()
 			beam.write(
 				encodeCompletionAck({

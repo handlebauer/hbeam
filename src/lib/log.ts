@@ -11,7 +11,11 @@ export { bold, cyan, dim, gray, green, italic, red, yellow } from 'colorette'
 
 const SEPARATOR_WIDTH = 36
 const CLEAR_LINE = '\r\u001B[2K'
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE = /\u001B\[[0-9;]*m/g
 const NO_OFFSET = 0
+const DEFAULT_COLUMNS = 80
+const MIN_LINES = 1
 
 export const INDENT = '  '
 export const SEPARATOR = dim('╌'.repeat(SEPARATOR_WIDTH))
@@ -25,6 +29,28 @@ export const SEPARATOR = dim('╌'.repeat(SEPARATOR_WIDTH))
  */
 export function write(message: string, indent: string = INDENT): void {
 	process.stderr.write(`${indent}${message}\n`)
+}
+
+/**
+ * Write to stderr at the standard indent level without a trailing newline.
+ *
+ * Useful for partial lines that will be completed later (e.g. status updates).
+ *
+ * @param message - Text to print.
+ * @returns Nothing.
+ */
+export function writeInline(message: string): void {
+	process.stderr.write(`${INDENT}${message}`)
+}
+
+/**
+ * Complete a partial line previously started by {@link writeInline}.
+ *
+ * @param message - Suffix text to append (a trailing newline is added).
+ * @returns Nothing.
+ */
+export function endInline(message: string): void {
+	process.stderr.write(`${message}\n`)
 }
 
 /**
@@ -113,6 +139,19 @@ function cursorDown(n: number): string {
 	return `\u001B[${n}B`
 }
 
+/**
+ * Count visual terminal lines an indented message occupies, accounting
+ * for ANSI escape codes and terminal width.  Falls back to 1 on non-TTY.
+ *
+ * @param message - Possibly ANSI-styled text (without indent prefix).
+ * @returns Number of visual lines.
+ */
+function visualLines(message: string): number {
+	const columns = process.stderr.columns || DEFAULT_COLUMNS
+	const width = INDENT.length + message.replace(ANSI_ESCAPE, '').length
+	return Math.max(MIN_LINES, Math.ceil(width / columns))
+}
+
 /** Handle for a line that animates in-place while content prints below. */
 export interface Spinner {
 	/** Write a blank line below the spinner and track the cursor offset. */
@@ -175,7 +214,7 @@ export function createSpinner(frames: readonly string[], intervalMs: number): Sp
 		},
 		write(message: string): void {
 			write(message)
-			offset++
+			offset += visualLines(message)
 		},
 	}
 }

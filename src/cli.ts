@@ -113,7 +113,7 @@ if (!ranSubcommand) {
 			keyPair: identity.keyPair,
 		})
 		runBeamSession(beam, {
-			announceLabel: 'PUBLIC KEY',
+			announceLabel: 'ANNOUNCING',
 			copyValue: copyToClipboard,
 			mode: 'announce',
 			value: beam.key,
@@ -122,7 +122,7 @@ if (!ranSubcommand) {
 		const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
 		const beam = new Beam(passphrase, beamOptions)
 		runBeamSession(beam, {
-			announceLabel: 'PASSPHRASE',
+			announceLabel: 'ANNOUNCING',
 			copyValue: copyToClipboard,
 			mode: beam.announce ? 'announce' : 'connect',
 			outputPath: argv.output,
