@@ -12,12 +12,15 @@ import * as b4a from 'b4a'
 import DHT from 'hyperdht'
 
 import { getPeer } from './addressbook.ts'
-import { fromBase32 } from './encoding.ts'
+import { fromBase32, randomBytes, toBase32 } from './encoding.ts'
 
 import type { EncryptedSocket, HyperDHTNode, KeyPair } from '../types.ts'
 
 const KEY_SEED_BYTES = 32
 const PUBLIC_KEY_BYTES = 32
+const EPHEMERAL_KEY_BYTES = 32
+const MIN_PORT = 1
+const MAX_PORT = 65_535
 
 /**
  * Check whether a string is a lowercase/uppercase 64-char hex public key.
@@ -122,4 +125,29 @@ export async function resolveRemoteKey(target: string): Promise<Buffer> {
 	}
 
 	return deriveKeyPair(normalized).publicKey
+}
+
+/**
+ * Parse and validate a TCP port number.
+ *
+ * @param value - Port text/number.
+ * @param label - Human-readable label used in error messages.
+ * @returns Parsed port number.
+ */
+export function parsePort(value: string | number, label: string): number {
+	const parsed = typeof value === 'number' ? value : Number(value)
+	if (!Number.isInteger(parsed) || parsed < MIN_PORT || parsed > MAX_PORT) {
+		throw new Error(`Invalid ${label}: ${value}`)
+	}
+	return parsed
+}
+
+/**
+ * Build a throwaway keypair for ephemeral sessions.
+ *
+ * @returns Ephemeral keypair derived from random passphrase material.
+ */
+export function createEphemeralKeyPair(): KeyPair {
+	const passphrase = toBase32(randomBytes(EPHEMERAL_KEY_BYTES))
+	return deriveKeyPair(passphrase)
 }

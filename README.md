@@ -2,7 +2,7 @@
 
 A 1-to-1 end-to-end encrypted pipe over [HyperDHT](https://github.com/holepunchto/hyperdht).
 
-Pipe data between two machines through a peer-to-peer encrypted tunnel. No server, no accounts. Just a shared passphrase or a persistent identity.
+Pipe data between two machines through a peer-to-peer encrypted tunnel. No server, no accounts. By default, hbeam uses your persistent identity; use `--temp` for one-time passphrase sessions.
 
 ## Install
 
@@ -12,55 +12,40 @@ npm install -g hbeam
 
 ## CLI
 
-### Send
+### Send (identity by default)
 
-Pipe data in and hbeam generates a passphrase (copied to your clipboard):
+Pipe data in and hbeam announces using your persistent identity (created on first use at `~/.config/hbeam/identity.json`):
 
 ```bash
 echo 'hello world' | hbeam
 ```
 
-```
-  HBEAM ·····
-  PASSPHRASE
-  nbsk4wlqmfuw...
-```
-
 ### Receive
 
-Pass the passphrase on the other machine to receive:
+Connect by saved name or public key:
 
 ```bash
-hbeam nbsk4wlqmfuw...
+hbeam connect workserver
 ```
 
-### Listen with a known passphrase
+### One-time passphrase mode
 
-Re-use a specific passphrase with `--listen`:
+Use `--temp` when you want a throwaway passphrase flow:
 
 ```bash
-echo 'hello again' | hbeam <passphrase> --listen
+# Generate and announce a one-time passphrase
+echo 'hello world' | hbeam --temp
+
+# Reuse a known passphrase and announce on it
+echo 'hello again' | hbeam <passphrase> --temp
+
+# Connect to an existing passphrase
+hbeam <passphrase>
 ```
-
-### Listen with a persistent identity
-
-Listen on a stable public key instead of a one-off passphrase. Your identity is created automatically on first use and stored at `~/.config/hbeam/identity.json`:
-
-```bash
-hbeam --listen
-```
-
-```
-  HBEAM ·····
-  PUBLIC KEY
-  a1b2c3d4e5f6...
-```
-
-Share your public key once — peers can reconnect any time without a new passphrase.
 
 ### Address book
 
-Save peers by name so you don't have to remember public keys:
+Save peers by name so you do not have to remember public keys:
 
 ```bash
 # Add a peer
@@ -99,23 +84,23 @@ hbeam whoami
   a1b2c3d4e5f6...
 ```
 
-### Bind — TCP tunnels over P2P
+### Expose - TCP over P2P
 
 Expose a local TCP service to a remote peer:
 
 ```bash
-# Reverse proxy: expose localhost:3000 with a one-time passphrase
-hbeam bind 3000
+# Reverse proxy: expose localhost:3000 using your identity
+hbeam expose 3000
 
-# Reverse proxy: expose using your persistent identity
-hbeam bind 3000 --listen
+# Reverse proxy: expose localhost:3000 with a one-time passphrase
+hbeam expose 3000 --temp
 ```
 
 ```
   HBEAM ···
 
   ANNOUNCING
-  nbsk4wlqmfuw...
+  a1b2c3d4e5f6...
   ONLINE [96.9.225.80:34725]
   FORWARDING localhost:3000
 ```
@@ -124,16 +109,17 @@ Access a remote peer's service locally:
 
 ```bash
 # Forward proxy: connect to a saved peer, listen on local port 8080
-hbeam bind workserver -p 8080
+hbeam connect workserver -p 8080
 
-# Forward proxy: connect by passphrase
-hbeam bind <passphrase> -p 8080
+# Forward proxy: connect by passphrase (one-time mode)
+hbeam connect <passphrase> -p 8080 --temp
 ```
 
 ```
   HBEAM ···
 
   CONNECTING workserver
+  ONLINE [96.9.225.80:34725]
   LISTENING 127.0.0.1:8080
 ```
 
@@ -147,10 +133,10 @@ Serve one file over an encrypted hbeam session:
 hbeam serve ./report.pdf
 ```
 
-This announces a one-time passphrase by default. To serve from your persistent identity instead:
+This serves from your persistent identity by default. For one-time passphrase mode instead:
 
 ```bash
-hbeam serve ./report.pdf --listen
+hbeam serve ./report.pdf --temp
 ```
 
 On the receiving side, connect normally (`hbeam <passphrase>` or `hbeam connect <name>`). hbeam detects the incoming file header and prompts where to save it. Use `-o` to skip the prompt:
@@ -169,25 +155,30 @@ hbeam <passphrase> > report.pdf
 ### Options
 
 ```
--l, --listen   Listen using passphrase or identity
+-t, --temp     Use one-time passphrase mode
 -o, --output   Save incoming file to a specific path
--p, --port     Local listen port (bind forward mode)
---host         Target/listen host (bind mode, default: localhost)
+-p, --port     Local listen port (connect forward mode)
+--host         Target/listen host (expose/connect mode, default: localhost)
 -h, --help     Show help
 -v, --version  Show version
 ```
 
 ## How it works
 
+Identity mode (default):
+
+1. A persistent Noise keypair is loaded from `~/.config/hbeam/identity.json` (or created on first use).
+2. A HyperDHT node announces (server) or connects (client) using that keypair.
+3. The Noise protocol negotiates an encrypted session between the two peers.
+4. Data flows through a `streamx` duplex stream - stdin/stdout on the CLI, or any readable/writable in code.
+
+One-time mode (`--temp`):
+
 1. A 32-byte random seed is generated and encoded as a base32 passphrase.
-2. A Noise keypair is deterministically derived from the passphrase using `sodium-universal`.
+2. A Noise keypair is deterministically derived from that passphrase using `sodium-universal`.
 3. An ephemeral HyperDHT node announces (server) or connects (client) using that keypair.
-4. The Noise protocol negotiates an encrypted session between the two peers.
-5. Data flows through a `streamx` duplex stream — stdin/stdout on the CLI, or any readable/writable in code.
 
-When using identity mode (`--listen` without a passphrase, or `connect`), a persistent keypair is loaded from `~/.config/hbeam/identity.json` instead of deriving one from a passphrase. The connection is still end-to-end encrypted via Noise.
-
-All traffic is end-to-end encrypted. The DHT is only used for peer discovery; it never sees the plaintext.
+All traffic is end-to-end encrypted. The DHT is only used for peer discovery; it never sees plaintext.
 
 ## Requirements
 

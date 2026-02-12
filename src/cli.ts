@@ -16,8 +16,8 @@ import { bold, cyan, dim, log, write, writeBlock } from '@/lib/log.ts'
 import { runBeamSession } from '@/lib/session.ts'
 
 import { Beam } from './beam.ts'
-import { runBindCommand } from './commands/bind.ts'
 import { runConnectCommand } from './commands/connect.ts'
+import { runExposeCommand } from './commands/expose.ts'
 import { runPeersCommand } from './commands/peers.ts'
 import { runServeCommand } from './commands/serve.ts'
 import { runWhoamiCommand } from './commands/whoami.ts'
@@ -30,8 +30,8 @@ const EXIT_SUCCESS = 0
 const NO_INDENT = ''
 
 const argv = mri(process.argv.slice(ARGV_OFFSET), {
-	alias: { h: 'help', l: 'listen', o: 'output', p: 'port', v: 'version' },
-	boolean: ['help', 'listen', 'version'],
+	alias: { h: 'help', o: 'output', p: 'port', t: 'temp', v: 'version' },
+	boolean: ['help', 'temp', 'version'],
 	string: ['host', 'output', 'port'],
 })
 
@@ -41,42 +41,45 @@ if (argv.help) {
 		'',
 		`${bold('Usage:')}`,
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
-		`  hbeam connect ${dim('<name>')}`,
-		`  hbeam bind ${dim('<port|passphrase|name|public-key>')} ${dim('[options]')}`,
+		`  hbeam connect ${dim('<name|passphrase|public-key>')} ${dim('[options]')}`,
+		`  hbeam expose ${dim('<port>')} ${dim('[options]')}`,
 		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
-		`  hbeam serve ${dim('<file>')} ${dim('[--listen]')}`,
+		`  hbeam serve ${dim('<file>')} ${dim('[--temp]')}`,
 		`  hbeam whoami`,
 		'',
 		`${bold('Options:')}`,
-		`  ${dim('-l, --listen')}   Listen using passphrase or identity`,
+		`  ${dim('-t, --temp')}     Use one-time passphrase mode`,
 		`  ${dim('-o, --output')}   Save incoming file to a specific path`,
-		`  ${dim('-p, --port')}     Local listen port (bind forward mode)`,
-		`  ${dim('--host')}         Host target/listen host (bind mode)`,
+		`  ${dim('-p, --port')}     Local listen port (connect forward mode)`,
+		`  ${dim('--host')}         Host target/listen host (expose/connect mode)`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
 		'',
 		`${bold('Examples:')}`,
-		`  ${dim('# Start a new pipe (generates a passphrase)')}`,
+		`  ${dim('# Start a pipe on your persistent identity')}`,
 		"  echo 'hello' | hbeam",
+		'',
+		`  ${dim('# Start a one-time pipe (generates a passphrase)')}`,
+		"  echo 'hello' | hbeam --temp",
 		'',
 		`  ${dim('# Connect to an existing pipe')}`,
 		'  hbeam <passphrase>',
 		'',
-		`  ${dim('# Listen with a specific passphrase')}`,
-		"  echo 'hello again' | hbeam <passphrase> --listen",
-		'',
-		`  ${dim('# Listen on your persistent identity')}`,
-		'  hbeam --listen',
+		`  ${dim('# Announce with a specific passphrase')}`,
+		"  echo 'hello again' | hbeam <passphrase> --temp",
 		'',
 		`  ${dim('# Save and connect to peers by name')}`,
 		'  hbeam peers add workserver <public-key>',
 		'  hbeam connect workserver',
 		'',
 		`  ${dim('# Expose local port 3000 over P2P')}`,
-		'  hbeam bind 3000 --listen',
+		'  hbeam expose 3000',
+		'',
+		`  ${dim('# Expose local port 3000 with a one-time passphrase')}`,
+		'  hbeam expose 3000 --temp',
 		'',
 		`  ${dim('# Create local TCP tunnel to remote peer')}`,
-		'  hbeam bind workserver -p 8080',
+		'  hbeam connect workserver -p 8080',
 		'',
 		`  ${dim('# Serve a single file')}`,
 		'  hbeam serve ./report.pdf',
@@ -97,15 +100,20 @@ if (firstArg === 'peers') {
 	process.exit(await runPeersCommand(restArgs))
 }
 if (firstArg === 'connect') {
-	await runConnectCommand(restArgs, { outputPath: argv.output })
+	await runConnectCommand(restArgs, {
+		host: argv.host,
+		outputPath: argv.output,
+		port: argv.port,
+		temp: argv.temp,
+	})
 	ranSubcommand = true
 }
-if (firstArg === 'bind') {
-	await runBindCommand(restArgs, { host: argv.host, listen: argv.listen, port: argv.port })
+if (firstArg === 'expose') {
+	await runExposeCommand(restArgs, { host: argv.host, temp: argv.temp })
 	ranSubcommand = true
 }
 if (firstArg === 'serve') {
-	await runServeCommand(restArgs, { listen: argv.listen })
+	await runServeCommand(restArgs, { temp: argv.temp })
 	ranSubcommand = true
 }
 if (firstArg === 'whoami') {
@@ -115,7 +123,7 @@ if (firstArg === 'whoami') {
 if (!ranSubcommand) {
 	const passphrase = firstArg
 
-	if (argv.listen && !passphrase) {
+	if (!argv.temp && !passphrase) {
 		const identity = await loadOrCreateIdentityWithMeta()
 		if (identity.created) {
 			log(dim('IDENTITY CREATED'))
@@ -133,7 +141,7 @@ if (!ranSubcommand) {
 			value: beam.key,
 		})
 	} else {
-		const beamOptions: BeamOptions | undefined = argv.listen ? { announce: true } : undefined
+		const beamOptions: BeamOptions | undefined = argv.temp ? { announce: true } : undefined
 		const beam = new Beam(passphrase, beamOptions)
 		runBeamSession(beam, {
 			announceLabel: 'ANNOUNCING',

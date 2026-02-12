@@ -1,7 +1,8 @@
 /**
- * Reusable TCP-over-DHT tunnel primitives for bind-like commands.
+ * Reusable TCP-over-DHT tunnel primitives for expose and connect commands.
  *
- * Provides reverse and forward proxy modes with connection lifecycle events.
+ * Provides reverse and forward proxy modes with connection lifecycle events,
+ * plus shared runtime helpers (shutdown, error classification, key display).
  *
  * @module
  */
@@ -9,6 +10,16 @@ import { EventEmitter } from 'node:events'
 import net from 'node:net'
 
 import { awaitOpen, createNode } from './dht.ts'
+import {
+	blank,
+	clearLine,
+	dim,
+	endInline,
+	log,
+	logError,
+	type Spinner,
+	writeInline,
+} from './log.ts'
 
 import type {
 	EncryptedSocket,
@@ -21,6 +32,12 @@ import type {
 } from '../types.ts'
 
 const DEFAULT_FORWARD_HOST = '127.0.0.1'
+const EXIT_FAILURE = 1
+const EXIT_SUCCESS = 0
+const FIRST_ACTIVE_CONNECTION = 1
+const NO_ACTIVE_CONNECTIONS = 0
+const KEY_PREFIX_START = 0
+const SHORT_KEY_PREFIX = 12
 
 interface SocketWithRemotePublicKey {
 	remotePublicKey?: Buffer
@@ -47,6 +64,109 @@ function pipeBothWays(left: net.Socket, right: EncryptedSocket): void {
 function getRemotePublicKeyHex(socket: EncryptedSocket): string | undefined {
 	const candidate = socket as unknown as SocketWithRemotePublicKey
 	return candidate.remotePublicKey?.toString('hex')
+}
+
+/**
+ * Render a short public-key hint for status lines.
+ *
+ * @param publicKey - Hex public key.
+ * @returns Short key preview.
+ */
+export function shortenKey(publicKey: string): string {
+	if (publicKey.length <= SHORT_KEY_PREFIX) {
+		return publicKey
+	}
+
+	return `${publicKey.slice(KEY_PREFIX_START, SHORT_KEY_PREFIX)}...`
+}
+
+/**
+ * Determine whether a tunnel error is a non-fatal per-connection close.
+ *
+ * @param error - Error emitted by tunnel internals.
+ * @returns True when tunnel should continue running.
+ */
+export function isBenignConnectionError(error: Error): boolean {
+	const message = error.message.toLowerCase()
+	const code = (error as NodeJS.ErrnoException).code?.toLowerCase() ?? ''
+
+	return (
+		code === 'econnreset' ||
+		code === 'epipe' ||
+		message.includes('connection reset by peer') ||
+		message.includes('writable stream closed prematurely') ||
+		message.includes('premature close')
+	)
+}
+
+/**
+ * Register SIGINT/SIGTERM handlers and bind tunnel lifecycle events to UI output.
+ *
+ * @param tunnel - Active tunnel controller.
+ * @param spinner - Active spinner instance.
+ * @returns Nothing.
+ */
+export function registerShutdown(tunnel: TunnelController, spinner: Spinner): void {
+	let shuttingDown = false
+	let spinnerStopped = false
+
+	function stopSpinnerOnce(): void {
+		if (spinnerStopped) {
+			return
+		}
+		spinnerStopped = true
+		spinner.stop()
+	}
+
+	async function shutdown(exitCode: number): Promise<void> {
+		if (shuttingDown) {
+			return
+		}
+
+		shuttingDown = true
+		stopSpinnerOnce()
+		blank()
+		log(dim('SHUTTING DOWN'))
+		blank()
+		await tunnel.close().catch(() => {})
+		process.exit(exitCode)
+	}
+
+	process.once('SIGINT', () => {
+		clearLine()
+		void shutdown(EXIT_SUCCESS)
+	})
+
+	process.once('SIGTERM', () => {
+		void shutdown(EXIT_SUCCESS)
+	})
+
+	tunnel.on('error', error => {
+		if (isBenignConnectionError(error)) {
+			return
+		}
+		logError(error.message)
+		void shutdown(EXIT_FAILURE)
+	})
+
+	/**
+	 * Only log edge transitions to avoid noisy per-connection spam.
+	 */
+	tunnel.on('connect', event => {
+		if (shuttingDown || event.activeConnections !== FIRST_ACTIVE_CONNECTION) {
+			return
+		}
+		stopSpinnerOnce()
+		const peerHint = event.remotePublicKey ? ` ${dim(shortenKey(event.remotePublicKey))}` : ''
+		writeInline(`SOCKET OPEN${peerHint}`)
+	})
+
+	tunnel.on('disconnect', event => {
+		if (shuttingDown || event.activeConnections !== NO_ACTIVE_CONNECTIONS) {
+			return
+		}
+		endInline(' CLOSED')
+	})
 }
 
 /**

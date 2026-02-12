@@ -47,7 +47,7 @@ const FIRST_INDEX = 0
 const NEXT_OFFSET = 1
 
 interface ServeCommandOptions {
-	listen?: boolean
+	temp?: boolean
 }
 
 /**
@@ -59,30 +59,34 @@ interface ServeCommandOptions {
 function showUsageError(message: string): never {
 	blank()
 	logError(message)
-	write(dim('Usage: hbeam serve <file> [--listen]'))
+	write(dim('Usage: hbeam serve <file> [--temp]'))
 	blank()
+
 	process.exit(EXIT_FAILURE)
 }
 
 /**
  * Resolve identity mode for the serve command.
  *
- * @param listen - Whether identity listen mode was requested.
+ * @param temp - Whether one-time passphrase mode was requested.
  * @returns Announce label plus optional keypair override.
  */
-async function resolveServeIdentity(listen: boolean | undefined): Promise<{
+async function resolveServeIdentity(temp: boolean | undefined): Promise<{
 	announceLabel: string
 	keyPair?: KeyPair
 }> {
-	if (!listen) {
+	if (temp) {
 		return { announceLabel: 'ANNOUNCING' }
 	}
+
 	const identity = await loadOrCreateIdentityWithMeta()
+
 	if (identity.created) {
 		blank()
 		log(dim('IDENTITY CREATED'))
 		write(cyan(identity.keyPair.publicKey.toString('hex')))
 	}
+
 	return {
 		announceLabel: 'ANNOUNCING',
 		keyPair: identity.keyPair,
@@ -118,7 +122,7 @@ export async function runServeCommand(
 		showUsageError(`Invalid file size: ${targetFile}`)
 	}
 
-	const identity = await resolveServeIdentity(options.listen)
+	const identity = await resolveServeIdentity(options.temp)
 	const beam = identity.keyPair
 		? new Beam({ announce: true, keyPair: identity.keyPair })
 		: new Beam(undefined, { announce: true })
