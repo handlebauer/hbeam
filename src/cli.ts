@@ -12,13 +12,14 @@ import mri from 'mri'
 
 import { copyToClipboard } from '@/lib/clipboard.ts'
 import { loadOrCreateIdentityWithMeta } from '@/lib/identity.ts'
-import { bold, cyan, dim, log, write, writeBlock } from '@/lib/log.ts'
+import { blank, bold, cyan, dim, log, logError, write, writeBlock } from '@/lib/log.ts'
 import { runBeamSession } from '@/lib/session.ts'
 
 import { Beam } from './beam.ts'
 import { runConnectCommand } from './commands/connect.ts'
 import { runExposeCommand } from './commands/expose.ts'
 import { runGatewayCommand } from './commands/gateway.ts'
+import { runOpenCommand } from './commands/open.ts'
 import { runPeersCommand } from './commands/peers.ts'
 import { runServeCommand } from './commands/serve.ts'
 import { runWhoamiCommand } from './commands/whoami.ts'
@@ -26,6 +27,7 @@ import { runWhoamiCommand } from './commands/whoami.ts'
 import type { BeamOptions } from './types.ts'
 
 const ARGV_OFFSET = 2
+const EXIT_FAILURE = 1
 const EXIT_SUCCESS = 0
 
 const NO_INDENT = ''
@@ -42,7 +44,8 @@ if (argv.help) {
 		'',
 		`${bold('Usage:')}`,
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
-		`  hbeam connect ${dim('<name|passphrase|public-key>')} ${dim('[options]')}`,
+		`  hbeam connect ${dim('<name>')} ${dim('[options]')}`,
+		`  hbeam open ${dim('<name|passphrase|public-key>')} ${dim('[options]')}`,
 		`  hbeam expose ${dim('<port>')} ${dim('[options]')}`,
 		`  hbeam gateway ${dim('[options]')}`,
 		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
@@ -52,8 +55,8 @@ if (argv.help) {
 		`${bold('Options:')}`,
 		`  ${dim('-t, --temp')}     Use one-time passphrase mode`,
 		`  ${dim('-o, --output')}   Save incoming file to a specific path`,
-		`  ${dim('-p, --port')}     Local listen port (connect/gateway mode)`,
-		`  ${dim('--host')}         Host target/listen host (expose/connect mode)`,
+		`  ${dim('-p, --port')}     Local listen port (open/gateway mode)`,
+		`  ${dim('--host')}         Target/listen host (expose mode)`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
 		'',
@@ -80,8 +83,11 @@ if (argv.help) {
 		`  ${dim('# Expose local port 3000 with a one-time passphrase')}`,
 		'  hbeam expose 3000 --temp',
 		'',
-		`  ${dim('# Create local TCP tunnel to remote peer')}`,
-		'  hbeam connect workserver -p 8080',
+		`  ${dim('# Open a remote app in your browser')}`,
+		'  hbeam open workserver',
+		'',
+		`  ${dim('# Open on a fixed local port')}`,
+		'  hbeam open workserver -p 8080',
 		'',
 		`  ${dim('# Route localhost subdomains to peers')}`,
 		'  hbeam gateway -p 9000',
@@ -105,27 +111,39 @@ let ranSubcommand = false
 if (firstArg === 'peers') {
 	process.exit(await runPeersCommand(restArgs))
 }
+
 if (firstArg === 'connect') {
-	await runConnectCommand(restArgs, {
-		host: argv.host,
-		outputPath: argv.output,
-		port: argv.port,
-		temp: argv.temp,
-	})
+	if (argv.port !== undefined) {
+		blank()
+		logError('`connect -p` has been removed. Use `hbeam open <target> [-p <port>]`.')
+		blank()
+		process.exit(EXIT_FAILURE)
+	}
+
+	await runConnectCommand(restArgs, { outputPath: argv.output })
 	ranSubcommand = true
 }
+
+if (firstArg === 'open') {
+	await runOpenCommand(restArgs, { port: argv.port, temp: argv.temp })
+	ranSubcommand = true
+}
+
 if (firstArg === 'expose') {
 	await runExposeCommand(restArgs, { host: argv.host, temp: argv.temp })
 	ranSubcommand = true
 }
+
 if (firstArg === 'gateway') {
 	await runGatewayCommand(restArgs, { port: argv.port, temp: argv.temp })
 	ranSubcommand = true
 }
+
 if (firstArg === 'serve') {
 	await runServeCommand(restArgs, { temp: argv.temp })
 	ranSubcommand = true
 }
+
 if (firstArg === 'whoami') {
 	process.exit(await runWhoamiCommand())
 }

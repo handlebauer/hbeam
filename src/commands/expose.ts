@@ -95,7 +95,6 @@ async function runReverseExpose(targetPort: number, options: ExposeCommandOption
 	spinner.write(dim(`ONLINE ${gray(`[${node.host}:${node.port}]`)}`))
 	spinner.blank()
 	spinner.write(`FORWARDING ${dim(`${host}:${targetPort}`)}`)
-	spinner.blank()
 
 	registerShutdown(tunnel, spinner)
 }

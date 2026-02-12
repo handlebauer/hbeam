@@ -22,7 +22,7 @@ echo 'hello world' | hbeam
 
 ### Receive
 
-Connect by saved name or public key:
+Connect a Beam stream by saved name:
 
 ```bash
 hbeam connect workserver
@@ -108,11 +108,14 @@ hbeam expose 3000 --temp
 Access a remote peer's service locally:
 
 ```bash
-# Forward proxy: connect to a saved peer, listen on local port 8080
-hbeam connect workserver -p 8080
+# Open a remote app from a saved peer in your browser
+hbeam open workserver
 
-# Forward proxy: connect by passphrase (one-time mode)
-hbeam connect <passphrase> -p 8080 --temp
+# Open a remote app by passphrase (one-time mode)
+hbeam open <passphrase> --temp
+
+# Open on a specific local port
+hbeam open workserver -p 8080
 ```
 
 ```
@@ -120,7 +123,7 @@ hbeam connect <passphrase> -p 8080 --temp
 
   CONNECTING workserver
   ONLINE [96.9.225.80:34725]
-  LISTENING 127.0.0.1:8080
+  OPENED http://127.0.0.1:8080/
 ```
 
 Any TCP traffic (HTTP, SSH, databases, etc.) can be tunneled. Both sides are end-to-end encrypted via Noise.
@@ -147,7 +150,8 @@ You can also run gateway in one-time mode:
 hbeam gateway -p 9000 --temp
 ```
 
-The gateway resolves subdomains with the same target rules as `hbeam connect`: hex public key, address-book name, then passphrase.
+The gateway resolves subdomains with the same target rules as `hbeam open`: hex public key, address-book name, then passphrase.
+Use this when you want one long-running local router for multiple peers. For single-peer app access, use `hbeam open`.
 
 ### Serve a single file
 
@@ -181,8 +185,8 @@ hbeam <passphrase> > report.pdf
 ```
 -t, --temp     Use one-time passphrase mode
 -o, --output   Save incoming file to a specific path
--p, --port     Local listen port (connect/gateway mode)
---host         Target/listen host (expose/connect mode, default: localhost)
+-p, --port     Local listen port (open/gateway mode)
+--host         Target/listen host (expose mode, default: localhost)
 -h, --help     Show help
 -v, --version  Show version
 ```
