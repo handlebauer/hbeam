@@ -18,6 +18,7 @@ import { runBeamSession } from '@/lib/session.ts'
 import { Beam } from './beam.ts'
 import { runConnectCommand } from './commands/connect.ts'
 import { runExposeCommand } from './commands/expose.ts'
+import { runGatewayCommand } from './commands/gateway.ts'
 import { runPeersCommand } from './commands/peers.ts'
 import { runServeCommand } from './commands/serve.ts'
 import { runWhoamiCommand } from './commands/whoami.ts'
@@ -43,6 +44,7 @@ if (argv.help) {
 		`  hbeam ${dim('[passphrase]')} ${dim('[options]')}`,
 		`  hbeam connect ${dim('<name|passphrase|public-key>')} ${dim('[options]')}`,
 		`  hbeam expose ${dim('<port>')} ${dim('[options]')}`,
+		`  hbeam gateway ${dim('[options]')}`,
 		`  hbeam peers ${dim('<add|rm|ls> ...')}`,
 		`  hbeam serve ${dim('<file>')} ${dim('[--temp]')}`,
 		`  hbeam whoami`,
@@ -50,7 +52,7 @@ if (argv.help) {
 		`${bold('Options:')}`,
 		`  ${dim('-t, --temp')}     Use one-time passphrase mode`,
 		`  ${dim('-o, --output')}   Save incoming file to a specific path`,
-		`  ${dim('-p, --port')}     Local listen port (connect forward mode)`,
+		`  ${dim('-p, --port')}     Local listen port (connect/gateway mode)`,
 		`  ${dim('--host')}         Host target/listen host (expose/connect mode)`,
 		`  ${dim('-h, --help')}     Show this help`,
 		`  ${dim('-v, --version')}  Show version`,
@@ -81,6 +83,10 @@ if (argv.help) {
 		`  ${dim('# Create local TCP tunnel to remote peer')}`,
 		'  hbeam connect workserver -p 8080',
 		'',
+		`  ${dim('# Route localhost subdomains to peers')}`,
+		'  hbeam gateway -p 9000',
+		'  open http://workserver.localhost:9000/',
+		'',
 		`  ${dim('# Serve a single file')}`,
 		'  hbeam serve ./report.pdf',
 	])
@@ -110,6 +116,10 @@ if (firstArg === 'connect') {
 }
 if (firstArg === 'expose') {
 	await runExposeCommand(restArgs, { host: argv.host, temp: argv.temp })
+	ranSubcommand = true
+}
+if (firstArg === 'gateway') {
+	await runGatewayCommand(restArgs, { port: argv.port, temp: argv.temp })
 	ranSubcommand = true
 }
 if (firstArg === 'serve') {

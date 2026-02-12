@@ -125,6 +125,30 @@ hbeam connect <passphrase> -p 8080 --temp
 
 Any TCP traffic (HTTP, SSH, databases, etc.) can be tunneled. Both sides are end-to-end encrypted via Noise.
 
+### Gateway - local HTTP router for peers
+
+Run a local HTTP gateway that maps `{peer}.localhost` to remote peers over P2P:
+
+```bash
+# Start gateway on port 9000
+hbeam gateway -p 9000
+
+# Browser or curl traffic routed to address-book peer "workserver"
+open http://workserver.localhost:9000/
+curl http://workserver.localhost:9000/health
+
+# Route directly to a raw public key
+curl http://a1b2c3d4e5f6...localhost:9000/
+```
+
+You can also run gateway in one-time mode:
+
+```bash
+hbeam gateway -p 9000 --temp
+```
+
+The gateway resolves subdomains with the same target rules as `hbeam connect`: hex public key, address-book name, then passphrase.
+
 ### Serve a single file
 
 Serve one file over an encrypted hbeam session:
@@ -157,7 +181,7 @@ hbeam <passphrase> > report.pdf
 ```
 -t, --temp     Use one-time passphrase mode
 -o, --output   Save incoming file to a specific path
--p, --port     Local listen port (connect forward mode)
+-p, --port     Local listen port (connect/gateway mode)
 --host         Target/listen host (expose/connect mode, default: localhost)
 -h, --help     Show help
 -v, --version  Show version
